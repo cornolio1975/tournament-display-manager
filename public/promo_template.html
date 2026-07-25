@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SP SPORTDATA SOLUTION Promo Video</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 1920px;
+      height: 1080px;
+      background: #060913;
+      color: #ffffff;
+      font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Dynamic Grid Background */
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+      background-size: 80px 80px;
+      transform: perspective(500px) rotateX(60deg) translateY(-100px);
+      animation: gridMove 20s linear infinite;
+    }
+
+    @keyframes gridMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 0 800px; }
+    }
+
+    /* Glow Spotlights */
+    .spotlight-cyan {
+      position: absolute;
+      top: -200px;
+      left: 10%;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .spotlight-red {
+      position: absolute;
+      bottom: -200px;
+      right: 10%;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(225, 29, 72, 0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    /* Main Container */
+    .content-box {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 60px 100px;
+      background: rgba(11, 15, 25, 0.75);
+      border: 2px solid rgba(0, 240, 255, 0.3);
+      border-radius: 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 0 60px rgba(0, 240, 255, 0.2), inset 0 0 40px rgba(0, 240, 255, 0.05);
+      width: 1600px;
+    }
+
+    .logo-img {
+      height: 140px;
+      object-contain: contain;
+      filter: drop-shadow(0 4px 20px rgba(0,0,0,0.9));
+      margin-bottom: 30px;
+      animation: pulseLogo 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseLogo {
+      0% { transform: scale(1); filter: drop-shadow(0 4px 20px rgba(0,0,0,0.9)); }
+      100% { transform: scale(1.03); filter: drop-shadow(0 0 35px rgba(225, 29, 72, 0.6)); }
+    }
+
+    .web-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 30px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 100px;
+      color: #00F0FF;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 25px;
+      text-transform: uppercase;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    }
+
+    .tagline-hero {
+      font-size: 64px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 60%, #00F0FF 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    .sub-text {
+      font-size: 32px;
+      color: #94A3B8;
+      font-weight: 600;
+      max-width: 1200px;
+      line-height: 1.4;
+      margin-bottom: 40px;
+    }
+
+    /* Feature Grid Pill */
+    .features-row {
+      display: flex;
+      gap: 30px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .feature-card {
+      flex: 1;
+      padding: 24px 30px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #00F0FF 0%, #3B82F6 100%);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: 900;
+      shrink: 0;
+    }
+
+    .feature-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #FFF;
+      text-align: left;
+    }
+
+    .feature-desc {
+      font-size: 16px;
+      color: #38BDF8;
+      text-align: left;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* Bottom Web Footer Overlay */
+    .footer-bar {
+      position: absolute;
+      bottom: 40px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 100px;
+      z-index: 20;
+    }
+
+    .web-url {
+      font-size: 28px;
+      font-weight: 800;
+      color: #00F0FF;
+      letter-spacing: 2px;
+      text-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #E11D48;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .live-dot {
+      width: 14px;
+      height: 14px;
+      background: #E11D48;
+      border-radius: 50%;
+      box-shadow: 0 0 15px #E11D48;
+      animation: blink 1s infinite alternate;
+    }
+    @keyframes blink {
+      0% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="spotlight-cyan"></div>
+  <div class="spotlight-red"></div>
+
+  <div class="content-box">
+    <!-- Web Intro Banner -->
+    <div class="web-badge">
+      <span>Official Portal: spsportdatasolution.org</span>
+    </div>
+
+    <!-- Official Logo -->
+    <img src="/sp_logo.jpg" class="logo-img" alt="SP SportData Solution">
+
+    <!-- Tagline Hero -->
+    <div class="tagline-hero">Precision. Speed. Results.</div>
+
+    <div class="sub-text">
+      Next-Gen Martial Arts & Tournament Display Solution Powering Live Championship Scoreboards & Presentation Screens
+    </div>
+
+    <!-- 3 Feature Pillars -->
+    <div class="features-row">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div>
+          <div class="feature-title">Real-Time Scoring</div>
+          <div class="feature-desc">Zero-Latency Sync</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📺</div>
+        <div>
+          <div class="feature-title">Broadcast Display</div>
+          <div class="feature-desc">Public Presentation</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <div>
+          <div class="feature-title">Sponsor Management</div>
+          <div class="feature-desc">Dynamic Rotation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="web-url">spsportdatasolution.org</div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span>Tournament Display Management System</span>
+    </div>
+  </div>
+</body>
+</html>
