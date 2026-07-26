@@ -13,12 +13,14 @@ import {
   Layers,
   Activity,
   Zap,
+  ListOrdered,
 } from 'lucide-react';
 import { getSponsors, saveSponsors, getTournaments, saveTournaments, getPlaylist, savePlaylist } from '@/lib/storage';
 import { Sponsor, Tournament, PlaylistItem, ActiveTab, ToastMessage } from '@/lib/types';
 import { SponsorManager } from '@/components/sponsors/SponsorManager';
 import { TournamentManager } from '@/components/tournaments/TournamentManager';
 import { PlaylistManager } from '@/components/playlist/PlaylistManager';
+import { DisplayPlaylistModal } from '@/components/playlist/DisplayPlaylistModal';
 import { ToastContainer } from '@/components/ui/Toast';
 import { OpenTournamentDisplayButton } from '@/components/karatetech/OpenTournamentDisplayButton';
 import { SpLogo } from '@/components/ui/SpLogo';
@@ -29,6 +31,7 @@ export default function AdminDashboardPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isDisplayPlaylistModalOpen, setIsDisplayPlaylistModalOpen] = useState(false);
 
   // Load initial storage state
   useEffect(() => {
@@ -89,6 +92,12 @@ export default function AdminDashboardPage() {
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsDisplayPlaylistModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-cyan-400 font-extrabold text-xs tracking-wide shadow-md transition"
+            >
+              <ListOrdered className="w-4 h-4 stroke-[2.5]" /> Manage Playlists
+            </button>
             <OpenTournamentDisplayButton variant="glass" />
             <button
               onClick={handleLaunchDisplay}
@@ -141,255 +150,156 @@ export default function AdminDashboardPage() {
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            <Film className="w-4 h-4" /> Display Playlist ({playlistItemsCount})
+            <Film className="w-4 h-4" /> Media Playlist ({playlistItemsCount})
           </button>
         </div>
       </div>
 
-      {/* MAIN CONTAINER */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && (
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-8"
-            >
-              {/* PAGE TITLE & SUBTITLE */}
-              <div className="glass-panel p-8 rounded-3xl border border-slate-800 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="relative z-10 max-w-3xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 text-xs font-semibold mb-3">
-                    <Sparkles className="w-3.5 h-3.5" /> Sports-Tech Control Center
+      {/* MAIN CONTAINER CONTENT */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+        {activeTab === 'dashboard' && (
+          <div className="flex flex-col gap-8">
+            {/* HERO STATS OVERVIEW */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* TOURNAMENT CARD */}
+              <div
+                onClick={() => setActiveTab('tournaments')}
+                className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 to-slate-900/50 border border-slate-800 hover:border-cyan-500/40 transition cursor-pointer group shadow-lg"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-110 transition">
+                    <Trophy className="w-6 h-6" />
                   </div>
-                  <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                    Tournament Display Management
-                  </h1>
-                  <p className="mt-2 text-base text-slate-300 leading-relaxed">
-                    Manage tournament display content, sponsors, videos, and public presentation screens.
-                  </p>
-                </div>
-              </div>
-
-              {/* 4 LARGE DASHBOARD CARDS */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* CARD 1: Sponsor Management */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                  onClick={() => setActiveTab('sponsors')}
-                  className="glass-panel p-6 rounded-2xl border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(0,240,255,0.15)] cursor-pointer group transition-all relative overflow-hidden flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="p-4 rounded-2xl bg-cyan-950/50 border border-cyan-500/30 text-cyan-400 group-hover:scale-110 transition">
-                      <ShieldCheck className="w-8 h-8" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 font-bold">
-                      {activeSponsorsCount} Active
-                    </span>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition">
-                      Sponsor Management
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Upload sponsor logos, manage external URLs, sequence display orders, and soft-delete items.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-cyan-400">
-                    <span>Configure Sponsors</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-                  </div>
-                </motion.div>
-
-                {/* CARD 2: Tournament Details */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                  onClick={() => setActiveTab('tournaments')}
-                  className="glass-panel p-6 rounded-2xl border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(0,240,255,0.15)] cursor-pointer group transition-all relative overflow-hidden flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="p-4 rounded-2xl bg-cyan-950/50 border border-cyan-500/30 text-cyan-400 group-hover:scale-110 transition">
-                      <Trophy className="w-8 h-8" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 font-bold truncate max-w-[140px]">
-                      {activeTournamentObj ? activeTournamentObj.name : 'No Active Event'}
-                    </span>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition">
-                      Tournament Details
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Set up event info, venues, date ranges, organizer profiles, and enforce single active tournament.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-cyan-400">
-                    <span>Manage Tournament</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-                  </div>
-                </motion.div>
-
-                {/* CARD 3: Display Playlist */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                  onClick={() => setActiveTab('playlist')}
-                  className="glass-panel p-6 rounded-2xl border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(0,240,255,0.15)] cursor-pointer group transition-all relative overflow-hidden flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="p-4 rounded-2xl bg-cyan-950/50 border border-cyan-500/30 text-cyan-400 group-hover:scale-110 transition">
-                      <Film className="w-8 h-8" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 font-bold">
-                      {playlistItemsCount} Media Items
-                    </span>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition">
-                      Display Playlist
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Upload MP4/WebM videos, JPG/PNG slide images, set custom slideshow durations, and reorder.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-cyan-400">
-                    <span>Edit Playlist</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-                  </div>
-                </motion.div>
-
-                {/* CARD 4: Launch Public Display */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                  onClick={handleLaunchDisplay}
-                  className="glass-panel p-6 rounded-2xl border border-cyan-500/50 shadow-[0_0_30px_rgba(0,240,255,0.15)] cursor-pointer group transition-all relative overflow-hidden flex flex-col justify-between bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="p-4 rounded-2xl bg-cyan-500 text-black shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition">
-                      <MonitorPlay className="w-8 h-8 stroke-[2.5]" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-cyan-400 text-black text-xs font-bold tracking-wider uppercase">
-                      Live Presentation
-                    </span>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition">
-                      Launch Public Display
-                    </h3>
-                    <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                      Open borderless public screen at <code className="text-cyan-400 font-mono">/display</code> with continuous loop, video playback, and floating controls.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-cyan-500/30 flex items-center justify-between text-xs font-extrabold text-cyan-300">
-                    <span className="flex items-center gap-1.5">
-                      Launch Screen Window <ExternalLink className="w-3.5 h-3.5" />
-                    </span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* INTEGRATION SECTION DEMO */}
-              <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-cyan-400" />
-                    <h3 className="text-base font-bold text-white">KarateTech Integration Component</h3>
-                  </div>
-                  <span className="text-xs font-mono text-slate-400">
-                    Standalone Ready
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Active Tournament
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">
-                  This component opens the active tournament presentation screen directly:
+                <h3 className="text-lg font-extrabold text-white mt-4 line-clamp-1">
+                  {activeTournamentObj ? activeTournamentObj.name : 'No Active Event'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                  {activeTournamentObj ? activeTournamentObj.venue : 'Configure active championship event'}
                 </p>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <code className="text-xs font-mono text-cyan-300">
-                    window.open("/display", "_blank", "noopener,noreferrer");
-                  </code>
-                  <OpenTournamentDisplayButton />
+                <div className="flex items-center gap-1 text-xs font-bold text-cyan-400 mt-4 group-hover:translate-x-1 transition">
+                  <span>Manage Details</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </div>
               </div>
-            </motion.div>
-          )}
 
-          {activeTab === 'sponsors' && (
-            <motion.div
-              key="sponsors"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-            >
-              <SponsorManager
-                sponsors={sponsors}
-                onSave={handleSaveSponsors}
-                addToast={addToast}
-              />
-            </motion.div>
-          )}
+              {/* SPONSOR CARD */}
+              <div
+                onClick={() => setActiveTab('sponsors')}
+                className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 to-slate-900/50 border border-slate-800 hover:border-cyan-500/40 transition cursor-pointer group shadow-lg"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-110 transition">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Active Sponsors
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-4">
+                  <span className="text-3xl font-black text-white">{activeSponsorsCount}</span>
+                  <span className="text-xs text-slate-400">Logos Displaying</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Sponsor wall ticker overlay on broadcast</p>
+                <div className="flex items-center gap-1 text-xs font-bold text-cyan-400 mt-4 group-hover:translate-x-1 transition">
+                  <span>Manage Sponsors</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
 
-          {activeTab === 'tournaments' && (
-            <motion.div
-              key="tournaments"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-            >
-              <TournamentManager
-                tournaments={tournaments}
-                onSave={handleSaveTournaments}
-                addToast={addToast}
-              />
-            </motion.div>
-          )}
+              {/* PLAYLIST ENGINE CARD */}
+              <div
+                onClick={() => setIsDisplayPlaylistModalOpen(true)}
+                className="p-6 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-slate-900/90 to-slate-900/50 border border-cyan-500/30 hover:border-cyan-400 transition cursor-pointer group shadow-lg shadow-cyan-500/10"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-3 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 group-hover:scale-110 transition">
+                    <ListOrdered className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                    Database Playlists
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-4">
+                  <span className="text-3xl font-black text-white">Multi-Slide</span>
+                  <span className="text-xs text-cyan-300 font-bold">Rotation Player</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Scoreboards, Brackets, Medals, Kata & Schedule</p>
+                <div className="flex items-center gap-1 text-xs font-bold text-cyan-400 mt-4 group-hover:translate-x-1 transition">
+                  <span>Open Playlist Manager</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </div>
 
-          {activeTab === 'playlist' && (
-            <motion.div
-              key="playlist"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-            >
-              <PlaylistManager
-                playlist={playlist}
-                onSave={handleSavePlaylist}
-                addToast={addToast}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {/* QUICK ACTIONS BANNER */}
+            <div className="p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-extrabold uppercase tracking-wider mb-3">
+                  <Zap className="w-3.5 h-3.5" /> KarateTech Presentation Engine v2.5
+                </div>
+                <h2 className="text-2xl font-black text-white">
+                  Ready to stream live tournament results?
+                </h2>
+                <p className="text-sm text-slate-400 mt-1 max-w-xl">
+                  Launch full-screen broadcast mode to project real-time scoreboards, WKF Kata scores, brackets, and sponsor logos onto spectator displays.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                <button
+                  onClick={() => setIsDisplayPlaylistModalOpen(true)}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-extrabold text-sm flex items-center justify-center gap-2 transition"
+                >
+                  <ListOrdered className="w-4 h-4 text-cyan-400" /> Manage Playlists
+                </button>
+                <button
+                  onClick={handleLaunchDisplay}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-sm tracking-wide shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5"
+                >
+                  <MonitorPlay className="w-5 h-5 stroke-[2.5]" /> Launch Display Screen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sponsors' && (
+          <SponsorManager
+            sponsors={sponsors}
+            onSave={handleSaveSponsors}
+            addToast={addToast}
+          />
+        )}
+
+        {activeTab === 'tournaments' && (
+          <TournamentManager
+            tournaments={tournaments}
+            onSave={handleSaveTournaments}
+            addToast={addToast}
+          />
+        )}
+
+        {activeTab === 'playlist' && (
+          <PlaylistManager
+            playlist={playlist}
+            onSave={handleSavePlaylist}
+            addToast={addToast}
+          />
+        )}
       </main>
 
-      {/* FOOTER */}
-      <footer className="mt-auto border-t border-slate-800/80 bg-slate-950/80 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-300">SP SportData Solution</span>
-            <span>&bull;</span>
-            <span>Tournament Display Management</span>
-          </div>
-          <div>Precision. Speed. Results.</div>
-        </div>
-      </footer>
+      {/* DISPLAY PLAYLIST MANAGEMENT MODAL */}
+      <DisplayPlaylistModal
+        isOpen={isDisplayPlaylistModalOpen}
+        onClose={() => setIsDisplayPlaylistModalOpen(false)}
+        addToast={addToast}
+      />
 
-      {/* TOAST CONTAINER */}
+      {/* TOAST NOTIFICATION CONTAINER */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
