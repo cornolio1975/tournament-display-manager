@@ -27,8 +27,11 @@ import {
   UserCheck,
   Award,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   MonitorPlay,
   ListOrdered,
+  ArrowDownCircle,
 } from 'lucide-react';
 import { getSponsors, getActiveTournament, getPlaylist } from '@/lib/storage';
 import { Sponsor, Tournament, PlaylistItem } from '@/lib/types';
@@ -73,24 +76,35 @@ const DEMO_KATA_JUDGES = [
 ];
 
 const DEMO_BRACKETS = [
-  { id: 'b1', round: 'Semifinal 1', red: 'A. HAROUN (MAS)', blue: 'T. MORIMOTO (JPN)', score: '3 - 1', winner: 'red' },
-  { id: 'b2', round: 'Semifinal 2', red: 'K. STANISLAV (KAZ)', blue: 'M. ROSSI (ITA)', score: '4 - 2', winner: 'red' },
-  { id: 'b3', round: 'GOLD MEDAL MATCH', red: 'A. HAROUN (MAS)', blue: 'K. STANISLAV (KAZ)', score: '4 - 2 (LIVE)', winner: 'live' },
+  { id: 'b1', round: 'Quarterfinal 1', red: 'T. MORIMOTO (JPN)', blue: 'R. KAZIM (AZE)', score: '4 - 1', winner: 'red' },
+  { id: 'b2', round: 'Quarterfinal 2', red: 'A. HAROUN (MAS)', blue: 'J. SMITH (USA)', score: '5 - 0', winner: 'red' },
+  { id: 'b3', round: 'Quarterfinal 3', red: 'K. STANISLAV (KAZ)', blue: 'L. MARTINEZ (ARG)', score: '3 - 2', winner: 'red' },
+  { id: 'b4', round: 'Quarterfinal 4', red: 'M. ROSSI (ITA)', blue: 'H. ALI (EGY)', score: '2 - 0', winner: 'red' },
+  { id: 'b5', round: 'Semifinal 1', red: 'A. HAROUN (MAS)', blue: 'T. MORIMOTO (JPN)', score: '3 - 1', winner: 'red' },
+  { id: 'b6', round: 'Semifinal 2', red: 'K. STANISLAV (KAZ)', blue: 'M. ROSSI (ITA)', score: '4 - 2', winner: 'red' },
+  { id: 'b7', round: 'GOLD MEDAL MATCH', red: 'A. HAROUN (MAS)', blue: 'K. STANISLAV (KAZ)', score: '4 - 2 (LIVE)', winner: 'live' },
 ];
 
 const DEMO_MEDALS = [
-  { rank: 1, team: 'Malaysia National Team', gold: 5, silver: 3, bronze: 4, total: 12 },
-  { rank: 2, team: 'Senshi Karate Academy', gold: 4, silver: 4, bronze: 2, total: 10 },
-  { rank: 3, team: 'Japan Elite Karate Federation', gold: 3, silver: 5, bronze: 3, total: 11 },
-  { rank: 4, team: 'Kazakhstan Martial Club', gold: 2, silver: 1, bronze: 5, total: 8 },
+  { rank: 1, team: 'Malaysia National Karate Federation', gold: 6, silver: 4, bronze: 5, total: 15 },
+  { rank: 2, team: 'Senshi Martial Arts Academy', gold: 5, silver: 4, bronze: 3, total: 12 },
+  { rank: 3, team: 'Japan Elite Karate Team', gold: 4, silver: 6, bronze: 4, total: 14 },
+  { rank: 4, team: 'Kazakhstan National Club', gold: 3, silver: 2, bronze: 6, total: 11 },
+  { rank: 5, team: 'French Federation Karate', gold: 2, silver: 3, bronze: 4, total: 9 },
+  { rank: 6, team: 'Italian Combat Sports Center', gold: 2, silver: 2, bronze: 5, total: 9 },
+  { rank: 7, team: 'Spain National Team', gold: 1, silver: 3, bronze: 2, total: 6 },
 ];
 
 const DEMO_SCHEDULE = [
+  { bout: 36, category: 'Male Cadet Kata', red: 'S. KUMAR (IND)', blue: 'T. LEE (KOR)', tatami: 'Tatami 1', status: 'Completed' },
+  { bout: 37, category: 'Female Junior Kumite -53kg', red: 'M. PETROVA (BUL)', blue: 'K. CHEN (TPE)', tatami: 'Tatami 2', status: 'Completed' },
   { bout: 38, category: 'Female Senior Kata', red: 'Y. SHIMIZU (JPN)', blue: 'L. SANCHEZ (ESP)', tatami: 'Tatami 2', status: 'Completed' },
   { bout: 39, category: 'Male Senior Kumite -67kg', red: 'C. DANIEL (MAS)', blue: 'V. CHEN (TPE)', tatami: 'Tatami 1', status: 'Completed' },
   { bout: 40, category: 'Female Kumite -55kg', red: 'S. GORANOVA (BUL)', blue: 'A. TERLIUGA (UKR)', tatami: 'Tatami 2', status: 'In Progress' },
   { bout: 41, category: 'Male Senior Kumite -75kg', red: 'A. HAROUN (MAS)', blue: 'K. STANISLAV (KAZ)', tatami: 'Tatami 1', status: 'ON DECK' },
-  { bout: 42, category: 'Male Senior Kumite +84kg', red: 'T. KVESIC (CRO)', blue: 'G. ARkania (GEO)', tatami: 'Tatami 1', status: 'Upcoming' },
+  { bout: 42, category: 'Male Senior Kumite +84kg', red: 'T. KVESIC (CRO)', blue: 'G. ARKANia (GEO)', tatami: 'Tatami 1', status: 'Upcoming' },
+  { bout: 43, category: 'Female Senior Kumite +68kg', red: 'E. QUIRICI (SUI)', blue: 'I. ZARETSKA (AZE)', tatami: 'Tatami 2', status: 'Upcoming' },
+  { bout: 44, category: 'Male Senior Kata Final', red: 'K. MORIMOTO (JPN)', blue: 'D. QUINTERO (ESP)', tatami: 'Tatami 1', status: 'Upcoming' },
 ];
 
 export default function PublicDisplayPage() {
@@ -104,9 +118,6 @@ export default function PublicDisplayPage() {
   const [slideTimeRemaining, setSlideTimeRemaining] = useState<number>(15);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
 
-  // Legacy media index fallback
-  const [currentIndex, setCurrentIndex] = useState(0);
-
   // Playback & UI controls
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -119,8 +130,11 @@ export default function PublicDisplayPage() {
   const [fitMode, setFitMode] = useState<'cover' | 'contain' | 'fill'>('cover');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
+  // Auto-scroll State
+  const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
-  const slideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const slideContainerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load screen config
@@ -163,6 +177,44 @@ export default function PublicDisplayPage() {
     if (zoomLevel > 50) updateScreenConfig(fitMode, zoomLevel - 10);
   };
 
+  // Scroll Actions for Active Display Target
+  const handleScrollDown = () => {
+    if (slideContainerRef.current) {
+      slideContainerRef.current.scrollBy({ top: 320, behavior: 'smooth' });
+    }
+  };
+
+  const handleScrollUp = () => {
+    if (slideContainerRef.current) {
+      slideContainerRef.current.scrollBy({ top: -320, behavior: 'smooth' });
+    }
+  };
+
+  // Auto-scroll loop for long schedule/bracket tables
+  useEffect(() => {
+    if (!isAutoScrolling) return;
+
+    const interval = setInterval(() => {
+      if (slideContainerRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = slideContainerRef.current;
+        if (scrollTop + clientHeight >= scrollHeight - 20) {
+          slideContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          slideContainerRef.current.scrollBy({ top: 150, behavior: 'smooth' });
+        }
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [isAutoScrolling]);
+
+  // Reset scroll to top when slide changes
+  useEffect(() => {
+    if (slideContainerRef.current) {
+      slideContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [slideIndex]);
+
   // Load data & handle localStorage sync across tabs
   const loadData = () => {
     const activeSps = getSponsors().filter((s) => !s.isDeleted && s.active);
@@ -173,7 +225,6 @@ export default function PublicDisplayPage() {
     setTournament(activeTourn);
     setLegacyPlaylist(activeMedia);
 
-    // Check for target playlistId in query param or active DB playlist
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const qPlaylistId = params.get('playlistId');
@@ -258,7 +309,7 @@ export default function PublicDisplayPage() {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
       setShowControls(false);
-    }, 4000);
+    }, 4500);
   };
 
   // Fullscreen toggle
@@ -279,10 +330,10 @@ export default function PublicDisplayPage() {
   return (
     <div
       onMouseMove={handleMouseMove}
-      className="relative w-screen h-screen bg-[#060913] overflow-hidden font-sans text-white select-none cursor-none hover:cursor-default"
+      className="relative w-screen h-screen bg-[#060913] overflow-hidden font-sans text-white select-none"
     >
       {/* ========================================================================= */}
-      {/* MULTI-SLIDE PRESENTATION PLAYER RENDERER ENGINE */}
+      {/* MULTI-SLIDE PRESENTATION PLAYER RENDERER ENGINE WITH SCROLLING SUPPORT */}
       {/* ========================================================================= */}
 
       {!currentSlide ? (
@@ -298,319 +349,316 @@ export default function PublicDisplayPage() {
             No active display playlist configured. Click "Manage Playlists" in the bottom menu to configure live presentation loops.
           </p>
         </div>
-      ) : currentSlide.type === 'kumite_scoreboard' ? (
-        /* 1. LIVE KUMITE SPECTATOR SCOREBOARD (PRESERVED WKF BASELINE STYLING) */
-        <div className="absolute inset-0 flex flex-col justify-between p-8 bg-gradient-to-b from-[#0B0F19] via-[#090D16] to-[#04060A]">
-          {/* HEADER TAG */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 rounded-xl bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> LIVE KUMITE
-              </span>
-              <span className="text-sm font-black text-cyan-400 uppercase tracking-widest">
-                {currentSlide.tatami_filter || DEMO_KUMITE.tatami} — {currentSlide.category_filter || DEMO_KUMITE.category}
-              </span>
-            </div>
-            <div className="px-4 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 font-mono text-cyan-300 font-bold text-sm">
-              MATCH TIME: <span className="text-white text-base">{DEMO_KUMITE.matchTime}</span>
-            </div>
-          </div>
-
-          {/* MAIN SCOREBOARD CENTER PIECE */}
-          <div className="grid grid-cols-12 gap-6 my-auto items-center">
-            {/* AKA (RED ATHLETE) */}
-            <div className="col-span-5 bg-gradient-to-r from-red-950/80 via-red-900/40 to-slate-900/80 border-2 border-red-500/60 rounded-3xl p-8 flex flex-col justify-between shadow-[0_0_50px_rgba(239,68,68,0.25)] relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <span className="px-4 py-1 rounded-lg bg-red-600 font-black text-xs text-white uppercase tracking-wider">
-                  AKA (RED)
-                </span>
-                {DEMO_KUMITE.aka.senshu && (
-                  <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
-                    ★ SENSHU FIRST SCORE
+      ) : (
+        /* SCROLLABLE DISPLAY CONTAINER TARGET */
+        <div
+          ref={slideContainerRef}
+          className="absolute inset-0 overflow-y-auto overflow-x-hidden pt-28 pb-32 px-4 sm:px-8 custom-scrollbar scroll-smooth"
+        >
+          {currentSlide.type === 'kumite_scoreboard' ? (
+            /* 1. LIVE KUMITE SPECTATOR SCOREBOARD */
+            <div className="max-w-7xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col justify-between py-4">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 rounded-xl bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> LIVE KUMITE
                   </span>
-                )}
+                  <span className="text-sm font-black text-cyan-400 uppercase tracking-widest">
+                    {currentSlide.tatami_filter || DEMO_KUMITE.tatami} — {currentSlide.category_filter || DEMO_KUMITE.category}
+                  </span>
+                </div>
+                <div className="px-4 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 font-mono text-cyan-300 font-bold text-sm">
+                  MATCH TIME: <span className="text-white text-base">{DEMO_KUMITE.matchTime}</span>
+                </div>
               </div>
 
-              <div>
-                <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
-                  {DEMO_KUMITE.aka.name}
-                </h2>
-                <p className="text-sm font-extrabold text-red-300 mt-1">{DEMO_KUMITE.aka.club} ({DEMO_KUMITE.aka.country})</p>
-              </div>
-
-              <div className="flex items-end justify-between mt-8">
-                <div className="flex items-center gap-1.5">
-                  {['C1', 'C2', 'C3', 'HC', 'H'].map((f) => (
-                    <span
-                      key={f}
-                      className={`px-2.5 py-1 rounded-md text-xs font-black border ${
-                        DEMO_KUMITE.aka.fouls.includes(f)
-                          ? 'bg-red-600 border-red-400 text-white shadow'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-600'
-                      }`}
-                    >
-                      {f}
+              {/* MAIN SCOREBOARD CENTER PIECE */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 my-auto items-center">
+                {/* AKA (RED ATHLETE) */}
+                <div className="lg:col-span-5 bg-gradient-to-r from-red-950/80 via-red-900/40 to-slate-900/80 border-2 border-red-500/60 rounded-3xl p-8 flex flex-col justify-between shadow-[0_0_50px_rgba(239,68,68,0.25)] relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="px-4 py-1 rounded-lg bg-red-600 font-black text-xs text-white uppercase tracking-wider">
+                      AKA (RED)
                     </span>
-                  ))}
-                </div>
-                <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
-                  {DEMO_KUMITE.aka.score}
-                </div>
-              </div>
-            </div>
-
-            {/* VS CENTER BADGE */}
-            <div className="col-span-2 flex flex-col items-center justify-center text-center">
-              <span className="text-4xl font-black text-slate-600 tracking-tighter">VS</span>
-              <span className="text-xs font-bold text-cyan-400 mt-2 tracking-widest uppercase">{DEMO_KUMITE.round}</span>
-            </div>
-
-            {/* AO (BLUE ATHLETE) */}
-            <div className="col-span-5 bg-gradient-to-l from-blue-950/80 via-blue-900/40 to-slate-900/80 border-2 border-blue-500/60 rounded-3xl p-8 flex flex-col justify-between shadow-[0_0_50px_rgba(59,130,246,0.25)] relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <span className="px-4 py-1 rounded-lg bg-blue-600 font-black text-xs text-white uppercase tracking-wider">
-                  AO (BLUE)
-                </span>
-                {DEMO_KUMITE.ao.senshu && (
-                  <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
-                    ★ SENSHU
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
-                  {DEMO_KUMITE.ao.name}
-                </h2>
-                <p className="text-sm font-extrabold text-blue-300 mt-1">{DEMO_KUMITE.ao.club} ({DEMO_KUMITE.ao.country})</p>
-              </div>
-
-              <div className="flex items-end justify-between mt-8">
-                <div className="flex items-center gap-1.5">
-                  {['C1', 'C2', 'C3', 'HC', 'H'].map((f) => (
-                    <span
-                      key={f}
-                      className={`px-2.5 py-1 rounded-md text-xs font-black border ${
-                        DEMO_KUMITE.ao.fouls.includes(f)
-                          ? 'bg-blue-600 border-blue-400 text-white shadow'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-600'
-                      }`}
-                    >
-                      {f}
-                    </span>
-                  ))}
-                </div>
-                <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
-                  {DEMO_KUMITE.ao.score}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-12" />
-        </div>
-      ) : currentSlide.type === 'kata_scoreboard' ? (
-        /* 2. WKF KATA 7-JUDGE SCOREBOARD */
-        <div className="absolute inset-0 flex flex-col justify-between p-8 bg-gradient-to-b from-[#090E1A] to-[#03060E]">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-            <div>
-              <span className="px-3 py-1 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-400 text-xs font-black uppercase tracking-wider">
-                WKF KATA SCOREBOARD (7 JUDGES)
-              </span>
-              <h2 className="text-2xl font-black text-white mt-1">Male Senior Kata Final Round</h2>
-            </div>
-            <div className="text-right">
-              <span className="text-xs text-slate-400 uppercase font-bold">Total Trimmed Score</span>
-              <div className="text-4xl font-black text-purple-400 font-mono">25.0</div>
-            </div>
-          </div>
-
-          {/* 7 JUDGES GRID */}
-          <div className="grid grid-cols-7 gap-4 my-auto">
-            {DEMO_KATA_JUDGES.map((j, idx) => (
-              <div
-                key={idx}
-                className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center flex flex-col items-center justify-center gap-2 shadow-lg"
-              >
-                <span className="text-xs font-bold text-slate-400">{j.name}</span>
-                <span className="text-3xl font-black text-white font-mono">{j.score.toFixed(1)}</span>
-                <span className="text-[10px] text-purple-400 font-semibold uppercase">Counted</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="h-12" />
-        </div>
-      ) : currentSlide.type === 'category_brackets' ? (
-        /* 3. CATEGORY BRACKETS & DRAWS */
-        <div className="absolute inset-0 flex flex-col justify-between p-8 bg-gradient-to-b from-[#0B0F19] to-black">
-          <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
-            <div>
-              <span className="px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-xs font-black uppercase tracking-wider">
-                TOURNAMENT BRACKETS & DRAWS
-              </span>
-              <h2 className="text-2xl font-black text-white mt-1">Male Senior Kumite -75kg Bracket</h2>
-            </div>
-            <span className="text-xs text-slate-400 font-bold uppercase">LIVE BRACKET PROGRESSION</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-8 my-auto">
-            {DEMO_BRACKETS.map((b) => (
-              <div key={b.id} className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-4">
-                <div className="text-xs font-black text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                  {b.round}
-                </div>
-                <div className="flex flex-col gap-2 text-sm font-bold">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-white">
-                    <span>{b.red}</span>
-                    <span className="font-mono font-black text-red-400">RED</span>
+                    {DEMO_KUMITE.aka.senshu && (
+                      <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
+                        ★ SENSHU FIRST SCORE
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 text-white">
-                    <span>{b.blue}</span>
-                    <span className="font-mono font-black text-blue-400">BLUE</span>
-                  </div>
-                </div>
-                <div className="text-center font-mono font-black text-cyan-300 text-sm mt-1">
-                  SCORE: {b.score}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          <div className="h-12" />
-        </div>
-      ) : currentSlide.type === 'medal_standings' ? (
-        /* 4. MEDAL STANDINGS LEADERBOARD */
-        <div className="absolute inset-0 flex flex-col justify-between p-8 bg-gradient-to-b from-[#090F1E] to-[#02050C]">
-          <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
-            <div>
-              <span className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
-                CHAMPIONSHIP MEDAL STANDINGS
-              </span>
-              <h2 className="text-2xl font-black text-white mt-1">Overall Country & Club Tally</h2>
-            </div>
-            <Trophy className="w-8 h-8 text-amber-400" />
-          </div>
-
-          <div className="max-w-5xl mx-auto w-full my-auto flex flex-col gap-3">
-            <div className="grid grid-cols-12 px-6 py-2 text-xs font-black text-slate-400 uppercase tracking-wider">
-              <span className="col-span-1">Rank</span>
-              <span className="col-span-6">Team / Country</span>
-              <span className="col-span-1 text-center text-amber-400">Gold</span>
-              <span className="col-span-1 text-center text-slate-300">Silver</span>
-              <span className="col-span-1 text-center text-amber-600">Bronze</span>
-              <span className="col-span-2 text-right text-cyan-400">Total</span>
-            </div>
-
-            {DEMO_MEDALS.map((m) => (
-              <div
-                key={m.rank}
-                className="grid grid-cols-12 px-6 py-4 rounded-2xl bg-slate-900/80 border border-slate-800 items-center font-bold text-sm"
-              >
-                <span className="col-span-1 text-lg font-black text-white">#{m.rank}</span>
-                <span className="col-span-6 text-white text-base font-extrabold">{m.team}</span>
-                <span className="col-span-1 text-center font-mono font-black text-amber-400 text-base">{m.gold}</span>
-                <span className="col-span-1 text-center font-mono font-black text-slate-300 text-base">{m.silver}</span>
-                <span className="col-span-1 text-center font-mono font-black text-amber-600 text-base">{m.bronze}</span>
-                <span className="col-span-2 text-right font-mono font-black text-cyan-400 text-lg">{m.total}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="h-12" />
-        </div>
-      ) : currentSlide.type === 'match_schedule' ? (
-        /* 5. MATCH SCHEDULE QUEUE */
-        <div className="absolute inset-0 flex flex-col justify-between p-8 bg-gradient-to-b from-[#080D1A] to-[#020409]">
-          <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
-            <div>
-              <span className="px-3 py-1 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-400 text-xs font-black uppercase tracking-wider">
-                LIVE BOUT SCHEDULE & RING QUEUE
-              </span>
-              <h2 className="text-2xl font-black text-white mt-1">Upcoming Matches ({currentSlide.tatami_filter || 'All Tatamis'})</h2>
-            </div>
-            <Calendar className="w-8 h-8 text-blue-400" />
-          </div>
-
-          <div className="max-w-5xl mx-auto w-full my-auto flex flex-col gap-3">
-            {DEMO_SCHEDULE.map((s) => (
-              <div
-                key={s.bout}
-                className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-sm font-bold"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 font-mono font-black flex items-center justify-center">
-                    #{s.bout}
-                  </span>
                   <div>
-                    <h3 className="text-white font-extrabold text-base">{s.category}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      <span className="text-red-400">{s.red}</span> vs <span className="text-blue-400">{s.blue}</span>
-                    </p>
+                    <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
+                      {DEMO_KUMITE.aka.name}
+                    </h2>
+                    <p className="text-sm font-extrabold text-red-300 mt-1">{DEMO_KUMITE.aka.club} ({DEMO_KUMITE.aka.country})</p>
+                  </div>
+
+                  <div className="flex items-end justify-between mt-8">
+                    <div className="flex items-center gap-1.5">
+                      {['C1', 'C2', 'C3', 'HC', 'H'].map((f) => (
+                        <span
+                          key={f}
+                          className={`px-2.5 py-1 rounded-md text-xs font-black border ${
+                            DEMO_KUMITE.aka.fouls.includes(f)
+                              ? 'bg-red-600 border-red-400 text-white shadow'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-600'
+                          }`}
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
+                      {DEMO_KUMITE.aka.score}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs">{s.tatami}</span>
-                  <span
-                    className={`px-3 py-1 rounded-lg text-xs font-black ${
-                      s.status === 'ON DECK'
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse'
-                        : s.status === 'In Progress'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {s.status}
-                  </span>
+                {/* VS CENTER BADGE */}
+                <div className="lg:col-span-2 flex flex-col items-center justify-center text-center py-4">
+                  <span className="text-4xl font-black text-slate-600 tracking-tighter">VS</span>
+                  <span className="text-xs font-bold text-cyan-400 mt-2 tracking-widest uppercase">{DEMO_KUMITE.round}</span>
+                </div>
+
+                {/* AO (BLUE ATHLETE) */}
+                <div className="lg:col-span-5 bg-gradient-to-l from-blue-950/80 via-blue-900/40 to-slate-900/80 border-2 border-blue-500/60 rounded-3xl p-8 flex flex-col justify-between shadow-[0_0_50px_rgba(59,130,246,0.25)] relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="px-4 py-1 rounded-lg bg-blue-600 font-black text-xs text-white uppercase tracking-wider">
+                      AO (BLUE)
+                    </span>
+                    {DEMO_KUMITE.ao.senshu && (
+                      <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
+                        ★ SENSHU
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
+                      {DEMO_KUMITE.ao.name}
+                    </h2>
+                    <p className="text-sm font-extrabold text-blue-300 mt-1">{DEMO_KUMITE.ao.club} ({DEMO_KUMITE.ao.country})</p>
+                  </div>
+
+                  <div className="flex items-end justify-between mt-8">
+                    <div className="flex items-center gap-1.5">
+                      {['C1', 'C2', 'C3', 'HC', 'H'].map((f) => (
+                        <span
+                          key={f}
+                          className={`px-2.5 py-1 rounded-md text-xs font-black border ${
+                            DEMO_KUMITE.ao.fouls.includes(f)
+                              ? 'bg-blue-600 border-blue-400 text-white shadow'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-600'
+                          }`}
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
+                      {DEMO_KUMITE.ao.score}
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : currentSlide.type === 'kata_scoreboard' ? (
+            /* 2. WKF KATA 7-JUDGE SCOREBOARD */
+            <div className="max-w-7xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col justify-between py-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div>
+                  <span className="px-3 py-1 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-400 text-xs font-black uppercase tracking-wider">
+                    WKF KATA SCOREBOARD (7 JUDGES)
+                  </span>
+                  <h2 className="text-2xl font-black text-white mt-1">Male Senior Kata Final Round</h2>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 uppercase font-bold">Total Trimmed Score</span>
+                  <div className="text-4xl font-black text-purple-400 font-mono">25.0</div>
+                </div>
+              </div>
 
-          <div className="h-12" />
-        </div>
-      ) : currentSlide.type === 'announcement_sponsor' ? (
-        /* 6. ANNOUNCEMENT & SPONSOR SLIDE */
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-gradient-to-b from-slate-950 via-slate-900 to-black">
-          <Radio className="w-16 h-16 text-cyan-400 mb-6 animate-pulse" />
-          <h1 className="text-4xl font-black text-white tracking-wide max-w-3xl leading-tight">
-            {currentSlide.announcement_text || 'Official Karate Championship Live Broadcast'}
-          </h1>
-          {currentSlide.sponsor_image_url && (
-            <div className="mt-10 p-4 rounded-3xl bg-slate-900/80 border border-slate-800 max-w-2xl overflow-hidden shadow-2xl">
+              {/* 7 JUDGES GRID */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 my-auto">
+                {DEMO_KATA_JUDGES.map((j, idx) => (
+                  <div
+                    key={idx}
+                    className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center flex flex-col items-center justify-center gap-2 shadow-lg"
+                  >
+                    <span className="text-xs font-bold text-slate-400">{j.name}</span>
+                    <span className="text-3xl font-black text-white font-mono">{j.score.toFixed(1)}</span>
+                    <span className="text-[10px] text-purple-400 font-semibold uppercase">Counted</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : currentSlide.type === 'category_brackets' ? (
+            /* 3. CATEGORY BRACKETS & DRAWS */
+            <div className="max-w-7xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col py-4">
+              <div className="border-b border-slate-800 pb-4 flex items-center justify-between mb-6">
+                <div>
+                  <span className="px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-xs font-black uppercase tracking-wider">
+                    TOURNAMENT BRACKETS & DRAWS
+                  </span>
+                  <h2 className="text-2xl font-black text-white mt-1">Male Senior Kumite -75kg Bracket</h2>
+                </div>
+                <span className="text-xs text-slate-400 font-bold uppercase">LIVE BRACKET PROGRESSION</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-auto pb-8">
+                {DEMO_BRACKETS.map((b) => (
+                  <div key={b.id} className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-4">
+                    <div className="text-xs font-black text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                      {b.round}
+                    </div>
+                    <div className="flex flex-col gap-2 text-sm font-bold">
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-white">
+                        <span>{b.red}</span>
+                        <span className="font-mono font-black text-red-400">RED</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 text-white">
+                        <span>{b.blue}</span>
+                        <span className="font-mono font-black text-blue-400">BLUE</span>
+                      </div>
+                    </div>
+                    <div className="text-center font-mono font-black text-cyan-300 text-sm mt-1">
+                      SCORE: {b.score}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : currentSlide.type === 'medal_standings' ? (
+            /* 4. MEDAL STANDINGS LEADERBOARD */
+            <div className="max-w-6xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col py-4">
+              <div className="border-b border-slate-800 pb-4 flex items-center justify-between mb-6">
+                <div>
+                  <span className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
+                    CHAMPIONSHIP MEDAL STANDINGS
+                  </span>
+                  <h2 className="text-2xl font-black text-white mt-1">Overall Country & Club Tally</h2>
+                </div>
+                <Trophy className="w-8 h-8 text-amber-400" />
+              </div>
+
+              <div className="w-full flex flex-col gap-3 my-auto pb-8">
+                <div className="grid grid-cols-12 px-6 py-2 text-xs font-black text-slate-400 uppercase tracking-wider">
+                  <span className="col-span-1">Rank</span>
+                  <span className="col-span-6">Team / Country</span>
+                  <span className="col-span-1 text-center text-amber-400">Gold</span>
+                  <span className="col-span-1 text-center text-slate-300">Silver</span>
+                  <span className="col-span-1 text-center text-amber-600">Bronze</span>
+                  <span className="col-span-2 text-right text-cyan-400">Total</span>
+                </div>
+
+                {DEMO_MEDALS.map((m) => (
+                  <div
+                    key={m.rank}
+                    className="grid grid-cols-12 px-6 py-4 rounded-2xl bg-slate-900/80 border border-slate-800 items-center font-bold text-sm"
+                  >
+                    <span className="col-span-1 text-lg font-black text-white">#{m.rank}</span>
+                    <span className="col-span-6 text-white text-base font-extrabold">{m.team}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-amber-400 text-base">{m.gold}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-slate-300 text-base">{m.silver}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-amber-600 text-base">{m.bronze}</span>
+                    <span className="col-span-2 text-right font-mono font-black text-cyan-400 text-lg">{m.total}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : currentSlide.type === 'match_schedule' ? (
+            /* 5. MATCH SCHEDULE QUEUE */
+            <div className="max-w-6xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col py-4">
+              <div className="border-b border-slate-800 pb-4 flex items-center justify-between mb-6">
+                <div>
+                  <span className="px-3 py-1 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-400 text-xs font-black uppercase tracking-wider">
+                    LIVE BOUT SCHEDULE & RING QUEUE
+                  </span>
+                  <h2 className="text-2xl font-black text-white mt-1">Upcoming Matches ({currentSlide.tatami_filter || 'All Tatamis'})</h2>
+                </div>
+                <Calendar className="w-8 h-8 text-blue-400" />
+              </div>
+
+              <div className="w-full flex flex-col gap-3 my-auto pb-8">
+                {DEMO_SCHEDULE.map((s) => (
+                  <div
+                    key={s.bout}
+                    className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-sm font-bold"
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 font-mono font-black flex items-center justify-center">
+                        #{s.bout}
+                      </span>
+                      <div>
+                        <h3 className="text-white font-extrabold text-base">{s.category}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-red-400">{s.red}</span> vs <span className="text-blue-400">{s.blue}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs">{s.tatami}</span>
+                      <span
+                        className={`px-3 py-1 rounded-lg text-xs font-black ${
+                          s.status === 'ON DECK'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse'
+                            : s.status === 'In Progress'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : currentSlide.type === 'announcement_sponsor' ? (
+            /* 6. ANNOUNCEMENT & SPONSOR SLIDE */
+            <div className="max-w-5xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col items-center justify-center py-4 text-center">
+              <Radio className="w-16 h-16 text-cyan-400 mb-6 animate-pulse" />
+              <h1 className="text-4xl font-black text-white tracking-wide max-w-3xl leading-tight">
+                {currentSlide.announcement_text || 'Official Karate Championship Live Broadcast'}
+              </h1>
+              {currentSlide.sponsor_image_url && (
+                <div className="mt-10 p-4 rounded-3xl bg-slate-900/80 border border-slate-800 max-w-2xl overflow-hidden shadow-2xl">
+                  <img
+                    src={currentSlide.sponsor_image_url}
+                    alt={currentSlide.title}
+                    className="max-h-72 w-full object-cover rounded-2xl"
+                  />
+                </div>
+              )}
+              <p className="text-sm font-bold text-cyan-400 mt-6 tracking-widest uppercase">
+                POWERED BY KARATETECH & SP SPORTDATA SOLUTION
+              </p>
+            </div>
+          ) : currentSlide.type === 'video' ? (
+            /* 7. VIDEO MEDIA SLIDE */
+            <div className="min-h-[calc(100vh-14rem)] flex items-center justify-center bg-black">
+              <video
+                ref={videoRef}
+                src={currentSlide.video_url || '/sp_sportdata_promo_20s.mp4'}
+                autoPlay
+                muted={isMuted}
+                playsInline
+                onEnded={handleNextSlide}
+                className="w-full h-full max-h-[80vh] object-contain rounded-2xl"
+              />
+            </div>
+          ) : (
+            /* 8. IMAGE SLIDE */
+            <div className="min-h-[calc(100vh-14rem)] flex items-center justify-center bg-slate-950">
               <img
-                src={currentSlide.sponsor_image_url}
+                src={currentSlide.sponsor_image_url || 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=1200&auto=format&fit=crop&q=80'}
                 alt={currentSlide.title}
-                className="max-h-72 w-full object-cover rounded-2xl"
+                className="w-full h-full max-h-[80vh] object-contain rounded-2xl"
               />
             </div>
           )}
-          <p className="text-sm font-bold text-cyan-400 mt-6 tracking-widest uppercase">
-            POWERED BY KARATETECH & SP SPORTDATA SOLUTION
-          </p>
-        </div>
-      ) : currentSlide.type === 'video' ? (
-        /* 7. VIDEO MEDIA SLIDE */
-        <div className="absolute inset-0 flex items-center justify-center bg-black">
-          <video
-            ref={videoRef}
-            src={currentSlide.video_url || '/sp_sportdata_promo_20s.mp4'}
-            autoPlay
-            muted={isMuted}
-            playsInline
-            onEnded={handleNextSlide}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        /* 8. IMAGE SLIDE */
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
-          <img
-            src={currentSlide.sponsor_image_url || 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=1200&auto=format&fit=crop&q=80'}
-            alt={currentSlide.title}
-            className="w-full h-full object-cover"
-          />
         </div>
       )}
 
@@ -683,7 +731,7 @@ export default function PublicDisplayPage() {
       {/* FLOATING PUBLIC DISPLAY CONTROLS */}
       {showControls && (
         <div className="absolute inset-x-0 bottom-16 z-30 flex justify-center pointer-events-auto transition-opacity duration-300">
-          <div className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-slate-900/90 backdrop-blur-2xl border border-cyan-500/40 shadow-[0_0_30px_rgba(0,240,255,0.25)]">
+          <div className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-slate-900/90 backdrop-blur-2xl border border-cyan-500/40 shadow-[0_0_30px_rgba(0,240,255,0.25)] flex-wrap max-w-full justify-center">
             {/* Skip Previous Slide */}
             <button
               onClick={handlePrevSlide}
@@ -711,7 +759,42 @@ export default function PublicDisplayPage() {
               <SkipForward className="w-4 h-4" />
             </button>
 
-            <div className="h-6 w-px bg-slate-700 mx-1" />
+            <div className="h-6 w-px bg-slate-700 mx-1 hidden sm:block" />
+
+            {/* SCROLL BUTTON CONTROLLER FOR ACTIVE DISPLAY TARGET */}
+            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 gap-1" title="Scroll Up / Down active display target view">
+              <button
+                onClick={handleScrollUp}
+                className="p-2 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 transition"
+                title="Scroll Up Display View"
+              >
+                <ChevronUp className="w-4 h-4 text-cyan-400" />
+              </button>
+              <span className="text-[10px] font-mono font-bold text-cyan-300 uppercase px-1">Scroll</span>
+              <button
+                onClick={handleScrollDown}
+                className="p-2 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 transition"
+                title="Scroll Down Display View"
+              >
+                <ChevronDown className="w-4 h-4 text-cyan-400" />
+              </button>
+            </div>
+
+            {/* AUTO-SCROLL TOGGLE BUTTON */}
+            <button
+              onClick={() => setIsAutoScrolling(!isAutoScrolling)}
+              className={`px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
+                isAutoScrolling
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+              }`}
+              title={isAutoScrolling ? 'Auto-Scroll Active (Click to Disable)' : 'Auto-Scroll Inactive (Click to Enable)'}
+            >
+              <ArrowDownCircle className={`w-4 h-4 ${isAutoScrolling ? 'animate-bounce text-emerald-400' : ''}`} />
+              <span>Auto Scroll: {isAutoScrolling ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <div className="h-6 w-px bg-slate-700 mx-1 hidden sm:block" />
 
             {/* SLIDE COUNTDOWN TIMER BADGE */}
             <div className="px-3 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 flex items-center gap-2 text-xs font-mono font-bold text-cyan-400">
@@ -729,7 +812,7 @@ export default function PublicDisplayPage() {
               <span>Manage Playlists</span>
             </button>
 
-            <div className="h-6 w-px bg-slate-700 mx-1" />
+            <div className="h-6 w-px bg-slate-700 mx-1 hidden sm:block" />
 
             {/* Fullscreen Toggle */}
             <button
@@ -741,7 +824,7 @@ export default function PublicDisplayPage() {
             </button>
 
             {/* Slide Info */}
-            <div className="px-3 text-xs font-mono text-cyan-300 truncate max-w-[200px]">
+            <div className="px-3 text-xs font-mono text-cyan-300 truncate max-w-[180px] hidden md:block">
               {activeDisplayPlaylist && currentSlide ? (
                 <span>
                   #{slideIndex + 1}/{activeDisplayPlaylist.slides.length}: {currentSlide.title}
