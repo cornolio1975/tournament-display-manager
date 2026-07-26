@@ -200,9 +200,16 @@ export default function PublicDisplayPage() {
     };
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('ts_sponsors_updated', handleStorageChange);
+    window.addEventListener('ts_tournaments_updated', handleStorageChange);
+    window.addEventListener('ts_playlist_updated', handleStorageChange);
     window.addEventListener('ts_display_playlists_updated', handleStorageChange);
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('ts_sponsors_updated', handleStorageChange);
+      window.removeEventListener('ts_tournaments_updated', handleStorageChange);
+      window.removeEventListener('ts_playlist_updated', handleStorageChange);
       window.removeEventListener('ts_display_playlists_updated', handleStorageChange);
     };
   }, []);

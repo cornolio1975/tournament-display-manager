@@ -33,11 +33,33 @@ export default function AdminDashboardPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isDisplayPlaylistModalOpen, setIsDisplayPlaylistModalOpen] = useState(false);
 
-  // Load initial storage state
-  useEffect(() => {
+  const loadData = () => {
     setSponsors(getSponsors());
     setTournaments(getTournaments());
     setPlaylist(getPlaylist());
+  };
+
+  // Load initial state & subscribe to real-time cross-platform updates
+  useEffect(() => {
+    loadData();
+
+    const handleDataChange = () => {
+      loadData();
+    };
+
+    window.addEventListener('storage', handleDataChange);
+    window.addEventListener('ts_sponsors_updated', handleDataChange);
+    window.addEventListener('ts_tournaments_updated', handleDataChange);
+    window.addEventListener('ts_playlist_updated', handleDataChange);
+    window.addEventListener('ts_display_playlists_updated', handleDataChange);
+
+    return () => {
+      window.removeEventListener('storage', handleDataChange);
+      window.removeEventListener('ts_sponsors_updated', handleDataChange);
+      window.removeEventListener('ts_tournaments_updated', handleDataChange);
+      window.removeEventListener('ts_playlist_updated', handleDataChange);
+      window.removeEventListener('ts_display_playlists_updated', handleDataChange);
+    };
   }, []);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {

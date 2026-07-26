@@ -1,4 +1,13 @@
 import { DisplayPlaylist, DisplayPlaylistSlide } from './types';
+import {
+  getSponsors,
+  saveSponsors,
+  getTournaments,
+  saveTournaments,
+  getActiveTournament,
+  broadcastDatabaseUpdate,
+} from '@/lib/storage';
+import { Sponsor, Tournament } from '@/lib/types';
 
 const PLAYLISTS_STORAGE_KEY = 'ts_display_playlists';
 
@@ -127,14 +136,83 @@ function saveStoredPlaylists(playlists: DisplayPlaylist[]): void {
   if (!isClient) return;
   try {
     localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(playlists));
-    window.dispatchEvent(new CustomEvent('ts_display_playlists_updated', { detail: playlists }));
-    window.dispatchEvent(new Event('storage'));
+    broadcastDatabaseUpdate('playlist');
   } catch (err) {
     console.error('Failed to save display playlists to LocalStorage:', err);
   }
 }
 
 export const db = {
+  // --- TOURNAMENT MANAGEMENT MODULE ---
+  tournaments: {
+    list(): Tournament[] {
+      return getTournaments();
+    },
+    getActive(): Tournament | null {
+      return getActiveTournament();
+    },
+    saveAll(tournaments: Tournament[]): void {
+      saveTournaments(tournaments);
+    },
+    add(tournament: Omit<Tournament, 'id'>): Tournament {
+      const list = getTournaments();
+      const newT: Tournament = {
+        ...tournament,
+        id: `tourn-${Date.now()}`,
+      };
+      let updated = list;
+      if (newT.active) {
+        updated = list.map((t) => ({ ...t, active: false }));
+      }
+      updated = [newT, ...updated];
+      saveTournaments(updated);
+      return newT;
+    },
+    update(id: string, updates: Partial<Tournament>): Tournament | null {
+      const list = getTournaments();
+      const idx = list.findIndex((t) => t.id === id);
+      if (idx === -1) return null;
+      let updated = list;
+      if (updates.active) {
+        updated = updated.map((t) => ({ ...t, active: t.id === id }));
+      }
+      const item = { ...updated[idx], ...updates };
+      updated[idx] = item;
+      saveTournaments(updated);
+      return item;
+    },
+  },
+
+  // --- SPONSOR MANAGEMENT MODULE ---
+  sponsors: {
+    list(): Sponsor[] {
+      return getSponsors();
+    },
+    saveAll(sponsors: Sponsor[]): void {
+      saveSponsors(sponsors);
+    },
+    add(sponsor: Omit<Sponsor, 'id'>): Sponsor {
+      const list = getSponsors();
+      const newS: Sponsor = {
+        ...sponsor,
+        id: `sp-${Date.now()}`,
+      };
+      const updated = [...list, newS];
+      saveSponsors(updated);
+      return newS;
+    },
+    update(id: string, updates: Partial<Sponsor>): Sponsor | null {
+      const list = getSponsors();
+      const idx = list.findIndex((s) => s.id === id);
+      if (idx === -1) return null;
+      const updated = [...list];
+      updated[idx] = { ...updated[idx], ...updates };
+      saveSponsors(updated);
+      return updated[idx];
+    },
+  },
+
+  // --- DISPLAY PLAYLIST MODULE ---
   displayPlaylists: {
     list(): DisplayPlaylist[] {
       return getStoredPlaylists();
@@ -155,7 +233,6 @@ export const db = {
         updated_at: now,
       };
 
-      // If set as active, deactivate other playlists
       let updatedList = playlists;
       if (newPlaylist.is_active) {
         updatedList = playlists.map((p) => ({ ...p, is_active: false }));
@@ -174,7 +251,6 @@ export const db = {
       const now = new Date().toISOString();
       let updatedList = playlists;
 
-      // If updates set is_active to true, deactivate others
       if (updates.is_active) {
         updatedList = updatedList.map((p) => ({ ...p, is_active: p.id === id }));
       }
@@ -195,7 +271,6 @@ export const db = {
       const filtered = playlists.filter((p) => p.id !== id);
       if (filtered.length === playlists.length) return false;
 
-      // If we deleted the active one and have remaining playlists, set first as active
       if (playlists.find((p) => p.id === id)?.is_active && filtered.length > 0) {
         filtered[0].is_active = true;
       }

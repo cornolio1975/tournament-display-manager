@@ -5,6 +5,30 @@ const SPONSORS_KEY = 'sp_tournament_sponsors_v2';
 const TOURNAMENTS_KEY = 'sp_tournament_details_v2';
 const PLAYLIST_KEY = 'sp_tournament_playlist_v2';
 
+// Cross-tab & Multi-window Broadcast Channel for real-time DB sync across platforms
+let broadcastChannel: BroadcastChannel | null = null;
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    broadcastChannel = new BroadcastChannel('karatetech_db_sync_channel');
+  } catch (err) {
+    console.warn('BroadcastChannel initialization warning:', err);
+  }
+}
+
+// Helper to notify all platforms and open tabs
+export function broadcastDatabaseUpdate(type: 'sponsors' | 'tournaments' | 'playlist') {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(`ts_${type}_updated`));
+  window.dispatchEvent(new Event('storage'));
+  if (broadcastChannel) {
+    try {
+      broadcastChannel.postMessage({ type, timestamp: Date.now() });
+    } catch (e) {
+      console.warn('Broadcast message error:', e);
+    }
+  }
+}
+
 // In-memory cache for IndexedDB media strings (base64 data URLs)
 const mediaCache = new Map<string, string>();
 const pendingHydrations = new Set<string>();
@@ -119,26 +143,25 @@ export const DEFAULT_PLAYLIST: PlaylistItem[] = [
   },
 ];
 
-// Helper to check window availability
 const isClient = typeof window !== 'undefined';
 
-// Async helper to hydrate missing IndexedDB media references
 function hydrateMediaReference(idbKey: string) {
   if (!isClient || mediaCache.has(idbKey) || pendingHydrations.has(idbKey)) return;
   pendingHydrations.add(idbKey);
-  getIndexedDBItem(idbKey).then((resolvedUrl) => {
-    pendingHydrations.delete(idbKey);
-    if (resolvedUrl) {
-      mediaCache.set(idbKey, resolvedUrl);
-      window.dispatchEvent(new Event('storage'));
-    }
-  }).catch((err) => {
-    pendingHydrations.delete(idbKey);
-    console.error(`Failed to hydrate media key ${idbKey}:`, err);
-  });
+  getIndexedDBItem(idbKey)
+    .then((resolvedUrl) => {
+      pendingHydrations.delete(idbKey);
+      if (resolvedUrl) {
+        mediaCache.set(idbKey, resolvedUrl);
+        window.dispatchEvent(new Event('storage'));
+      }
+    })
+    .catch((err) => {
+      pendingHydrations.delete(idbKey);
+      console.error(`Failed to hydrate media key ${idbKey}:`, err);
+    });
 }
 
-// Helper to offload heavy base64 data URLs to IndexedDB
 function processMediaForSave<T extends { url?: string; logo?: string; id: string }>(
   items: T[],
   field: 'url' | 'logo'
@@ -155,7 +178,6 @@ function processMediaForSave<T extends { url?: string; logo?: string; id: string
   });
 }
 
-// Helper to resolve media URLs from in-memory cache or trigger async hydration
 function resolveMediaForLoad<T extends { url?: string; logo?: string }>(
   items: T[],
   field: 'url' | 'logo'
@@ -198,7 +220,7 @@ export function saveSponsors(sponsors: Sponsor[]): void {
   try {
     const processed = processMediaForSave(sponsors, 'logo');
     localStorage.setItem(SPONSORS_KEY, JSON.stringify(processed));
-    window.dispatchEvent(new Event('storage'));
+    broadcastDatabaseUpdate('sponsors');
   } catch (err) {
     console.warn('LocalStorage full, offloading all logos to IndexedDB...', err);
     try {
@@ -212,7 +234,7 @@ export function saveSponsors(sponsors: Sponsor[]): void {
         return s;
       });
       localStorage.setItem(SPONSORS_KEY, JSON.stringify(forceProcessed));
-      window.dispatchEvent(new Event('storage'));
+      broadcastDatabaseUpdate('sponsors');
     } catch (quotaErr) {
       console.error('Critical quota error saving sponsors:', quotaErr);
     }
@@ -260,7 +282,7 @@ export function saveTournaments(tournaments: Tournament[]): void {
   try {
     const processed = processMediaForSave(tournaments, 'logo');
     localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(processed));
-    window.dispatchEvent(new Event('storage'));
+    broadcastDatabaseUpdate('tournaments');
   } catch (err) {
     console.error('Failed to save tournaments:', err);
   }
@@ -285,7 +307,6 @@ export function getPlaylist(): PlaylistItem[] {
       return DEFAULT_PLAYLIST;
     }
     const list: PlaylistItem[] = JSON.parse(data);
-    // Ensure 20s promo video exists at start if missing
     if (!list.some((item) => item.url === '/sp_sportdata_promo_20s.mp4')) {
       const updated = [DEFAULT_PLAYLIST[0], ...list.filter((item) => item.id !== 'media-1')];
       try {
@@ -305,10 +326,9 @@ export function getPlaylist(): PlaylistItem[] {
 export function savePlaylist(items: PlaylistItem[]): void {
   if (!isClient) return;
   try {
-    // Automatically offload data: URLs (base64 uploads) to IndexedDB
     const processed = processMediaForSave(items, 'url');
     localStorage.setItem(PLAYLIST_KEY, JSON.stringify(processed));
-    window.dispatchEvent(new Event('storage'));
+    broadcastDatabaseUpdate('playlist');
   } catch (err) {
     console.warn('Quota warning saving playlist to LocalStorage. Offloading heavy URLs to IndexedDB...', err);
     try {
@@ -322,7 +342,7 @@ export function savePlaylist(items: PlaylistItem[]): void {
         return item;
       });
       localStorage.setItem(PLAYLIST_KEY, JSON.stringify(forceProcessed));
-      window.dispatchEvent(new Event('storage'));
+      broadcastDatabaseUpdate('playlist');
     } catch (quotaErr) {
       console.error('Critical quota error saving playlist:', quotaErr);
     }
