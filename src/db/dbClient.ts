@@ -8,6 +8,7 @@ import {
   broadcastDatabaseUpdate,
 } from '@/lib/storage';
 import { Sponsor, Tournament } from '@/lib/types';
+import { setIndexedDBItem, getIndexedDBItem } from '@/lib/idb';
 
 const PLAYLISTS_STORAGE_KEY = 'ts_display_playlists';
 
@@ -112,6 +113,72 @@ export const DEFAULT_DISPLAY_PLAYLISTS: DisplayPlaylist[] = [
 
 const isClient = typeof window !== 'undefined';
 
+// In-memory cache for slide media assets offloaded to IndexedDB
+const slideMediaCache = new Map<string, string>();
+const slidePendingHydrations = new Set<string>();
+
+function hydrateSlideMediaReference(idbKey: string) {
+  if (!isClient || slideMediaCache.has(idbKey) || slidePendingHydrations.has(idbKey)) return;
+  slidePendingHydrations.add(idbKey);
+  getIndexedDBItem(idbKey)
+    .then((resolvedUrl) => {
+      slidePendingHydrations.delete(idbKey);
+      if (resolvedUrl) {
+        slideMediaCache.set(idbKey, resolvedUrl);
+        window.dispatchEvent(new Event('storage'));
+      }
+    })
+    .catch(() => {
+      slidePendingHydrations.delete(idbKey);
+    });
+}
+
+function processPlaylistsForSave(playlists: DisplayPlaylist[]): DisplayPlaylist[] {
+  return playlists.map((playlist) => ({
+    ...playlist,
+    slides: playlist.slides.map((slide) => {
+      const updatedSlide = { ...slide };
+      if (slide.sponsor_image_url && slide.sponsor_image_url.startsWith('data:')) {
+        const idbKey = `idb_media_slide_${slide.id}_img`;
+        slideMediaCache.set(idbKey, slide.sponsor_image_url);
+        setIndexedDBItem(idbKey, slide.sponsor_image_url);
+        updatedSlide.sponsor_image_url = idbKey;
+      }
+      if (slide.video_url && slide.video_url.startsWith('data:')) {
+        const idbKey = `idb_media_slide_${slide.id}_vid`;
+        slideMediaCache.set(idbKey, slide.video_url);
+        setIndexedDBItem(idbKey, slide.video_url);
+        updatedSlide.video_url = idbKey;
+      }
+      return updatedSlide;
+    }),
+  }));
+}
+
+function resolvePlaylistsForLoad(playlists: DisplayPlaylist[]): DisplayPlaylist[] {
+  return playlists.map((playlist) => ({
+    ...playlist,
+    slides: playlist.slides.map((slide) => {
+      const updatedSlide = { ...slide };
+      if (slide.sponsor_image_url && slide.sponsor_image_url.startsWith('idb_media_')) {
+        if (slideMediaCache.has(slide.sponsor_image_url)) {
+          updatedSlide.sponsor_image_url = slideMediaCache.get(slide.sponsor_image_url);
+        } else {
+          hydrateSlideMediaReference(slide.sponsor_image_url);
+        }
+      }
+      if (slide.video_url && slide.video_url.startsWith('idb_media_')) {
+        if (slideMediaCache.has(slide.video_url)) {
+          updatedSlide.video_url = slideMediaCache.get(slide.video_url);
+        } else {
+          hydrateSlideMediaReference(slide.video_url);
+        }
+      }
+      return updatedSlide;
+    }),
+  }));
+}
+
 function getStoredPlaylists(): DisplayPlaylist[] {
   if (!isClient) return DEFAULT_DISPLAY_PLAYLISTS;
   try {
@@ -125,9 +192,9 @@ function getStoredPlaylists(): DisplayPlaylist[] {
       localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(DEFAULT_DISPLAY_PLAYLISTS));
       return DEFAULT_DISPLAY_PLAYLISTS;
     }
-    return parsed;
+    return resolvePlaylistsForLoad(parsed);
   } catch (err) {
-    console.error('Failed to load display playlists from LocalStorage:', err);
+    console.warn('Failed to load display playlists from LocalStorage:', err);
     return DEFAULT_DISPLAY_PLAYLISTS;
   }
 }
@@ -135,10 +202,36 @@ function getStoredPlaylists(): DisplayPlaylist[] {
 function saveStoredPlaylists(playlists: DisplayPlaylist[]): void {
   if (!isClient) return;
   try {
-    localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(playlists));
+    const processed = processPlaylistsForSave(playlists);
+    localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(processed));
     broadcastDatabaseUpdate('playlist');
   } catch (err) {
-    console.error('Failed to save display playlists to LocalStorage:', err);
+    console.warn('Quota exceeded on LocalStorage. Force offloading all slide media to IndexedDB...', err);
+    try {
+      const forceProcessed = playlists.map((playlist) => ({
+        ...playlist,
+        slides: playlist.slides.map((slide) => {
+          const updatedSlide = { ...slide };
+          if (slide.sponsor_image_url && slide.sponsor_image_url.length > 300) {
+            const idbKey = `idb_media_slide_${slide.id}_img`;
+            slideMediaCache.set(idbKey, slide.sponsor_image_url);
+            setIndexedDBItem(idbKey, slide.sponsor_image_url);
+            updatedSlide.sponsor_image_url = idbKey;
+          }
+          if (slide.video_url && slide.video_url.length > 300) {
+            const idbKey = `idb_media_slide_${slide.id}_vid`;
+            slideMediaCache.set(idbKey, slide.video_url);
+            setIndexedDBItem(idbKey, slide.video_url);
+            updatedSlide.video_url = idbKey;
+          }
+          return updatedSlide;
+        }),
+      }));
+      localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(forceProcessed));
+      broadcastDatabaseUpdate('playlist');
+    } catch (finalErr) {
+      console.warn('Unable to persist to LocalStorage quota, data preserved in IndexedDB cache.', finalErr);
+    }
   }
 }
 
