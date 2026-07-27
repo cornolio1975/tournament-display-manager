@@ -27,8 +27,11 @@ import {
   ChevronRight,
   RotateCcw,
 } from 'lucide-react';
-import { db, DEFAULT_DISPLAY_PLAYLISTS } from '@/db/dbClient';
+import { db } from '@/db/dbClient';
 import { DisplayPlaylist, DisplayPlaylistSlide, DisplaySlideType } from '@/db/types';
+import { getPlaylist, getSponsors } from '@/lib/storage';
+import { PlaylistItem, Sponsor } from '@/lib/types';
+import { MediaUploader } from '../ui/MediaUploader';
 
 interface DisplayPlaylistModalProps {
   isOpen: boolean;
@@ -107,6 +110,10 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Database Saved Media State
+  const [dbMediaList, setDbMediaList] = useState<PlaylistItem[]>([]);
+  const [dbSponsorsList, setDbSponsorsList] = useState<Sponsor[]>([]);
+
   // Form State
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -117,6 +124,13 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
   const loadData = () => {
     const list = db.displayPlaylists.list();
     setPlaylists(list);
+
+    // Load saved database media & sponsors lists
+    const media = getPlaylist().filter((item) => !item.isDeleted && item.active);
+    const sps = getSponsors().filter((s) => !s.isDeleted && s.active);
+    setDbMediaList(media);
+    setDbSponsorsList(sps);
+
     if (list.length > 0 && !selectedPlaylistId) {
       const active = list.find((p) => p.is_active) || list[0];
       setSelectedPlaylistId(active.id);
@@ -236,6 +250,21 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
 
   const handleAddSlide = (type: DisplaySlideType) => {
     const opt = SLIDE_TYPE_OPTIONS.find((o) => o.type === type);
+    
+    // Default values if media items exist in database
+    let defaultVideoUrl = undefined;
+    let defaultImageUrl = undefined;
+    if (type === 'video') {
+      const savedVideo = dbMediaList.find((m) => m.type === 'video');
+      defaultVideoUrl = savedVideo ? savedVideo.url : '/sp_sportdata_promo_20s.mp4';
+    } else if (type === 'image') {
+      const savedImg = dbMediaList.find((m) => m.type === 'image');
+      defaultImageUrl = savedImg ? savedImg.url : 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=1200&auto=format&fit=crop&q=80';
+    } else if (type === 'announcement_sponsor') {
+      const savedSp = dbSponsorsList[0];
+      defaultImageUrl = savedSp ? savedSp.logo : 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=1200&auto=format&fit=crop&q=80';
+    }
+
     const newSlide: DisplayPlaylistSlide = {
       id: `slide-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       type,
@@ -244,7 +273,8 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
       tatami_filter: formTatami === 'All Tatamis' ? 'All' : formTatami,
       order: formSlides.length + 1,
       announcement_text: type === 'announcement_sponsor' ? 'Official Karate Championship Live Broadcast' : undefined,
-      sponsor_image_url: type === 'announcement_sponsor' ? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=1200&auto=format&fit=crop&q=80' : undefined,
+      sponsor_image_url: defaultImageUrl,
+      video_url: defaultVideoUrl,
     };
     setFormSlides([...formSlides, newSlide]);
   };
@@ -267,6 +297,42 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
   const handleSlideChange = (index: number, field: keyof DisplayPlaylistSlide, value: any) => {
     const updated = [...formSlides];
     updated[index] = { ...updated[index], [field]: value };
+    setFormSlides(updated);
+  };
+
+  const handleSelectDatabaseMedia = (index: number, mediaId: string) => {
+    const foundMedia = dbMediaList.find((m) => m.id === mediaId);
+    if (!foundMedia) return;
+    const updated = [...formSlides];
+    const current = updated[index];
+    if (foundMedia.type === 'video') {
+      updated[index] = {
+        ...current,
+        title: foundMedia.title,
+        video_url: foundMedia.url,
+        duration_seconds: foundMedia.duration || 20,
+      };
+    } else {
+      updated[index] = {
+        ...current,
+        title: foundMedia.title,
+        sponsor_image_url: foundMedia.url,
+        duration_seconds: foundMedia.duration || 10,
+      };
+    }
+    setFormSlides(updated);
+    addToast?.({ type: 'info', title: 'Media Loaded from Database', message: `"${foundMedia.title}" linked to slide #${index + 1}.` });
+  };
+
+  const handleSelectDatabaseSponsor = (index: number, sponsorId: string) => {
+    const foundSp = dbSponsorsList.find((s) => s.id === sponsorId);
+    if (!foundSp) return;
+    const updated = [...formSlides];
+    const current = updated[index];
+    updated[index] = {
+      ...current,
+      sponsor_image_url: foundSp.logo,
+    };
     setFormSlides(updated);
   };
 
@@ -635,17 +701,111 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
                                 </select>
                               </div>
 
+                              {/* VIDEO SLIDE MEDIA INPUTS */}
+                              {slide.type === 'video' && (
+                                <div className="sm:col-span-3 space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                  {dbMediaList.length > 0 && (
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase text-cyan-400 mb-1">
+                                        Import Saved Video from Database:
+                                      </label>
+                                      <select
+                                        defaultValue=""
+                                        onChange={(e) => handleSelectDatabaseMedia(idx, e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-cyan-500/40 text-slate-200 text-xs focus:outline-none focus:border-cyan-400 font-semibold"
+                                      >
+                                        <option value="" disabled>-- Select Saved Database Video --</option>
+                                        {dbMediaList.filter((m) => m.type === 'video').map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            {m.title} ({m.duration}s)
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  <MediaUploader
+                                    type="video"
+                                    label="Video Asset URL or File Upload"
+                                    value={slide.video_url || ''}
+                                    onChange={(url) => handleSlideChange(idx, 'video_url', url)}
+                                  />
+                                </div>
+                              )}
+
+                              {/* IMAGE SLIDE MEDIA INPUTS */}
+                              {slide.type === 'image' && (
+                                <div className="sm:col-span-3 space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                  {dbMediaList.length > 0 && (
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase text-cyan-400 mb-1">
+                                        Import Saved Image/Poster from Database:
+                                      </label>
+                                      <select
+                                        defaultValue=""
+                                        onChange={(e) => handleSelectDatabaseMedia(idx, e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-cyan-500/40 text-slate-200 text-xs focus:outline-none focus:border-cyan-400 font-semibold"
+                                      >
+                                        <option value="" disabled>-- Select Saved Database Media --</option>
+                                        {dbMediaList.map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            {m.title} ({m.type.toUpperCase()})
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  <MediaUploader
+                                    type="image"
+                                    label="Image Banner URL or File Upload"
+                                    value={slide.sponsor_image_url || ''}
+                                    onChange={(url) => handleSlideChange(idx, 'sponsor_image_url', url)}
+                                  />
+                                </div>
+                              )}
+
+                              {/* ANNOUNCEMENT & SPONSOR SLIDE MEDIA INPUTS */}
                               {slide.type === 'announcement_sponsor' && (
-                                <div className="sm:col-span-3">
-                                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                                    Broadcast Announcement Text
-                                  </label>
-                                  <textarea
-                                    rows={2}
-                                    value={slide.announcement_text || ''}
-                                    onChange={(e) => handleSlideChange(idx, 'announcement_text', e.target.value)}
-                                    placeholder="Enter announcement banner message..."
-                                    className="w-full px-2.5 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                                <div className="sm:col-span-3 space-y-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                      Broadcast Announcement Text
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      value={slide.announcement_text || ''}
+                                      onChange={(e) => handleSlideChange(idx, 'announcement_text', e.target.value)}
+                                      placeholder="Enter announcement banner message..."
+                                      className="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                  </div>
+
+                                  {dbSponsorsList.length > 0 && (
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase text-cyan-400 mb-1">
+                                        Import Saved Sponsor Logo from Database:
+                                      </label>
+                                      <select
+                                        defaultValue=""
+                                        onChange={(e) => handleSelectDatabaseSponsor(idx, e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-cyan-500/40 text-slate-200 text-xs focus:outline-none focus:border-cyan-400 font-semibold"
+                                      >
+                                        <option value="" disabled>-- Select Saved Sponsor Logo --</option>
+                                        {dbSponsorsList.map((sp) => (
+                                          <option key={sp.id} value={sp.id}>
+                                            {sp.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  <MediaUploader
+                                    type="image"
+                                    label="Sponsor Logo / Image Banner"
+                                    value={slide.sponsor_image_url || ''}
+                                    onChange={(url) => handleSlideChange(idx, 'sponsor_image_url', url)}
                                   />
                                 </div>
                               )}
@@ -699,6 +859,7 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
                       {activeSelectedPlaylist.slides.map((slide, idx) => {
                         const opt = SLIDE_TYPE_OPTIONS.find((o) => o.type === slide.type);
                         const Icon = opt?.icon || Layers;
+                        const mediaPreview = slide.video_url || slide.sponsor_image_url;
                         return (
                           <div
                             key={slide.id || idx}
@@ -708,6 +869,17 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
                               <span className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-black text-sm flex items-center justify-center">
                                 {idx + 1}
                               </span>
+
+                              {mediaPreview && (
+                                <div className="w-12 h-12 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-0.5 shrink-0">
+                                  {slide.type === 'video' ? (
+                                    <video src={mediaPreview} className="w-full h-full object-cover" muted />
+                                  ) : (
+                                    <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover rounded" />
+                                  )}
+                                </div>
+                              )}
+
                               <div>
                                 <h4 className="font-extrabold text-sm text-slate-100 flex items-center gap-2">
                                   <Icon className="w-4 h-4 text-cyan-400" />
