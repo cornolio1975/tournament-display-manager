@@ -8,247 +8,22 @@ import {
   broadcastDatabaseUpdate,
 } from '@/lib/storage';
 import { Sponsor, Tournament } from '@/lib/types';
-import { setIndexedDBItem, getIndexedDBItem } from '@/lib/idb';
-
-const PLAYLISTS_STORAGE_KEY = 'ts_display_playlists';
-
-export const DEFAULT_DISPLAY_PLAYLISTS: DisplayPlaylist[] = [
-  {
-    id: 'pl-main-arena',
-    name: 'Main Arena Spectator Rotation',
-    description: 'Full spectator display loop rotating through Kumite, Brackets, Medals, Schedule, and Kata displays.',
-    tatami: 'All Tatamis',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    slides: [
-      {
-        id: 's-1',
-        type: 'kumite_scoreboard',
-        title: 'Live Kumite Spectator Scoreboard',
-        duration_seconds: 20,
-        tatami_filter: 'All',
-        order: 1,
-      },
-      {
-        id: 's-2',
-        type: 'category_brackets',
-        title: 'Tournament Category Brackets & Draws',
-        duration_seconds: 15,
-        tatami_filter: 'All',
-        category_filter: 'Male Senior Kumite -75kg',
-        order: 2,
-      },
-      {
-        id: 's-3',
-        type: 'medal_standings',
-        title: 'Championship Medal Tally & Leaderboard',
-        duration_seconds: 12,
-        order: 3,
-      },
-      {
-        id: 's-4',
-        type: 'match_schedule',
-        title: 'Live Match Schedule & Ring Queue',
-        duration_seconds: 15,
-        tatami_filter: 'All',
-        order: 4,
-      },
-      {
-        id: 's-5',
-        type: 'kata_scoreboard',
-        title: 'WKF 7-Judge Kata Scoreboard',
-        duration_seconds: 20,
-        tatami_filter: 'Tatami 2',
-        order: 5,
-      },
-      {
-        id: 's-6',
-        type: 'announcement_sponsor',
-        title: 'Official Championship Announcement',
-        duration_seconds: 10,
-        announcement_text: 'Welcome to the Karate Grand Prix Championship 2026! Athletes please check your bout schedule at Tatami 1 & 2.',
-        sponsor_image_url: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=1200&auto=format&fit=crop&q=80',
-        order: 6,
-      },
-    ],
-  },
-  {
-    id: 'pl-tatami-1',
-    name: 'Tatami 1 Live Loop',
-    description: 'Dedicated ring display stream for Tatami 1 match scoring and bout queuing.',
-    tatami: 'Tatami 1',
-    is_active: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    slides: [
-      {
-        id: 't1-s1',
-        type: 'kumite_scoreboard',
-        title: 'Tatami 1 Live Kumite Scoreboard',
-        duration_seconds: 25,
-        tatami_filter: 'Tatami 1',
-        order: 1,
-      },
-      {
-        id: 't1-s2',
-        type: 'match_schedule',
-        title: 'Tatami 1 Match Queue',
-        duration_seconds: 15,
-        tatami_filter: 'Tatami 1',
-        order: 2,
-      },
-      {
-        id: 't1-s3',
-        type: 'announcement_sponsor',
-        title: 'Official Arena Partners',
-        duration_seconds: 10,
-        announcement_text: 'Powered by KarateTech Display Engine & SP SportData Solution.',
-        sponsor_image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&auto=format&fit=crop&q=80',
-        order: 3,
-      },
-    ],
-  },
-];
-
-const isClient = typeof window !== 'undefined';
-
-// In-memory cache for slide media assets offloaded to IndexedDB
-const slideMediaCache = new Map<string, string>();
-const slidePendingHydrations = new Set<string>();
-
-function hydrateSlideMediaReference(idbKey: string) {
-  if (!isClient || slideMediaCache.has(idbKey) || slidePendingHydrations.has(idbKey)) return;
-  slidePendingHydrations.add(idbKey);
-  getIndexedDBItem(idbKey)
-    .then((resolvedUrl) => {
-      slidePendingHydrations.delete(idbKey);
-      if (resolvedUrl) {
-        slideMediaCache.set(idbKey, resolvedUrl);
-        window.dispatchEvent(new Event('storage'));
-      }
-    })
-    .catch(() => {
-      slidePendingHydrations.delete(idbKey);
-    });
-}
-
-function processPlaylistsForSave(playlists: DisplayPlaylist[]): DisplayPlaylist[] {
-  return playlists.map((playlist) => ({
-    ...playlist,
-    slides: playlist.slides.map((slide) => {
-      const updatedSlide = { ...slide };
-      if (slide.sponsor_image_url && slide.sponsor_image_url.startsWith('data:')) {
-        const idbKey = `idb_media_slide_${slide.id}_img`;
-        slideMediaCache.set(idbKey, slide.sponsor_image_url);
-        setIndexedDBItem(idbKey, slide.sponsor_image_url);
-        updatedSlide.sponsor_image_url = idbKey;
-      }
-      if (slide.video_url && slide.video_url.startsWith('data:')) {
-        const idbKey = `idb_media_slide_${slide.id}_vid`;
-        slideMediaCache.set(idbKey, slide.video_url);
-        setIndexedDBItem(idbKey, slide.video_url);
-        updatedSlide.video_url = idbKey;
-      }
-      return updatedSlide;
-    }),
-  }));
-}
-
-function resolvePlaylistsForLoad(playlists: DisplayPlaylist[]): DisplayPlaylist[] {
-  return playlists.map((playlist) => ({
-    ...playlist,
-    slides: playlist.slides.map((slide) => {
-      const updatedSlide = { ...slide };
-      if (slide.sponsor_image_url && slide.sponsor_image_url.startsWith('idb_media_')) {
-        if (slideMediaCache.has(slide.sponsor_image_url)) {
-          updatedSlide.sponsor_image_url = slideMediaCache.get(slide.sponsor_image_url);
-        } else {
-          hydrateSlideMediaReference(slide.sponsor_image_url);
-        }
-      }
-      if (slide.video_url && slide.video_url.startsWith('idb_media_')) {
-        if (slideMediaCache.has(slide.video_url)) {
-          updatedSlide.video_url = slideMediaCache.get(slide.video_url);
-        } else {
-          hydrateSlideMediaReference(slide.video_url);
-        }
-      }
-      return updatedSlide;
-    }),
-  }));
-}
-
-function getStoredPlaylists(): DisplayPlaylist[] {
-  if (!isClient) return DEFAULT_DISPLAY_PLAYLISTS;
-  try {
-    const raw = localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(DEFAULT_DISPLAY_PLAYLISTS));
-      return DEFAULT_DISPLAY_PLAYLISTS;
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(DEFAULT_DISPLAY_PLAYLISTS));
-      return DEFAULT_DISPLAY_PLAYLISTS;
-    }
-    return resolvePlaylistsForLoad(parsed);
-  } catch (err) {
-    console.warn('Failed to load display playlists from LocalStorage:', err);
-    return DEFAULT_DISPLAY_PLAYLISTS;
-  }
-}
-
-function saveStoredPlaylists(playlists: DisplayPlaylist[]): void {
-  if (!isClient) return;
-  try {
-    const processed = processPlaylistsForSave(playlists);
-    localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(processed));
-    broadcastDatabaseUpdate('playlist');
-  } catch (err) {
-    console.warn('Quota exceeded on LocalStorage. Force offloading all slide media to IndexedDB...', err);
-    try {
-      const forceProcessed = playlists.map((playlist) => ({
-        ...playlist,
-        slides: playlist.slides.map((slide) => {
-          const updatedSlide = { ...slide };
-          if (slide.sponsor_image_url && slide.sponsor_image_url.length > 300) {
-            const idbKey = `idb_media_slide_${slide.id}_img`;
-            slideMediaCache.set(idbKey, slide.sponsor_image_url);
-            setIndexedDBItem(idbKey, slide.sponsor_image_url);
-            updatedSlide.sponsor_image_url = idbKey;
-          }
-          if (slide.video_url && slide.video_url.length > 300) {
-            const idbKey = `idb_media_slide_${slide.id}_vid`;
-            slideMediaCache.set(idbKey, slide.video_url);
-            setIndexedDBItem(idbKey, slide.video_url);
-            updatedSlide.video_url = idbKey;
-          }
-          return updatedSlide;
-        }),
-      }));
-      localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(forceProcessed));
-      broadcastDatabaseUpdate('playlist');
-    } catch (finalErr) {
-      console.warn('Unable to persist to LocalStorage quota, data preserved in IndexedDB cache.', finalErr);
-    }
-  }
-}
+import { supabase } from '@/lib/supabaseClient';
 
 export const db = {
   // --- TOURNAMENT MANAGEMENT MODULE ---
   tournaments: {
-    list(): Tournament[] {
+    async list(): Promise<Tournament[]> {
       return getTournaments();
     },
-    getActive(): Tournament | null {
+    async getActive(): Promise<Tournament | null> {
       return getActiveTournament();
     },
-    saveAll(tournaments: Tournament[]): void {
-      saveTournaments(tournaments);
+    async saveAll(tournaments: Tournament[]): Promise<void> {
+      await saveTournaments(tournaments);
     },
-    add(tournament: Omit<Tournament, 'id'>): Tournament {
-      const list = getTournaments();
+    async add(tournament: Omit<Tournament, 'id'>): Promise<Tournament> {
+      const list = await getTournaments();
       const newT: Tournament = {
         ...tournament,
         id: `tourn-${Date.now()}`,
@@ -258,11 +33,11 @@ export const db = {
         updated = list.map((t) => ({ ...t, active: false }));
       }
       updated = [newT, ...updated];
-      saveTournaments(updated);
+      await saveTournaments(updated);
       return newT;
     },
-    update(id: string, updates: Partial<Tournament>): Tournament | null {
-      const list = getTournaments();
+    async update(id: string, updates: Partial<Tournament>): Promise<Tournament | null> {
+      const list = await getTournaments();
       const idx = list.findIndex((t) => t.id === id);
       if (idx === -1) return null;
       let updated = list;
@@ -271,108 +46,112 @@ export const db = {
       }
       const item = { ...updated[idx], ...updates };
       updated[idx] = item;
-      saveTournaments(updated);
+      await saveTournaments(updated);
       return item;
     },
   },
 
   // --- SPONSOR MANAGEMENT MODULE ---
   sponsors: {
-    list(): Sponsor[] {
+    async list(): Promise<Sponsor[]> {
       return getSponsors();
     },
-    saveAll(sponsors: Sponsor[]): void {
-      saveSponsors(sponsors);
+    async saveAll(sponsors: Sponsor[]): Promise<void> {
+      await saveSponsors(sponsors);
     },
-    add(sponsor: Omit<Sponsor, 'id'>): Sponsor {
-      const list = getSponsors();
+    async add(sponsor: Omit<Sponsor, 'id'>): Promise<Sponsor> {
+      const list = await getSponsors();
       const newS: Sponsor = {
         ...sponsor,
         id: `sp-${Date.now()}`,
       };
       const updated = [...list, newS];
-      saveSponsors(updated);
+      await saveSponsors(updated);
       return newS;
     },
-    update(id: string, updates: Partial<Sponsor>): Sponsor | null {
-      const list = getSponsors();
+    async update(id: string, updates: Partial<Sponsor>): Promise<Sponsor | null> {
+      const list = await getSponsors();
       const idx = list.findIndex((s) => s.id === id);
       if (idx === -1) return null;
       const updated = [...list];
       updated[idx] = { ...updated[idx], ...updates };
-      saveSponsors(updated);
+      await saveSponsors(updated);
       return updated[idx];
     },
   },
 
   // --- DISPLAY PLAYLIST MODULE ---
   displayPlaylists: {
-    list(): DisplayPlaylist[] {
-      return getStoredPlaylists();
+    async list(): Promise<DisplayPlaylist[]> {
+      const { data, error } = await supabase.from('display_playlists').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching display playlists:', error);
+        return [];
+      }
+      return data || [];
     },
 
-    getById(id: string): DisplayPlaylist | null {
-      const playlists = getStoredPlaylists();
-      return playlists.find((p) => p.id === id) || null;
+    async getById(id: string): Promise<DisplayPlaylist | null> {
+      const { data, error } = await supabase.from('display_playlists').select('*').eq('id', id).single();
+      if (error) {
+        console.error('Error fetching display playlist by id:', error);
+        return null;
+      }
+      return data;
     },
 
-    add(playlistData: Omit<DisplayPlaylist, 'id' | 'created_at' | 'updated_at'>): DisplayPlaylist {
-      const playlists = getStoredPlaylists();
+    async add(playlistData: Omit<DisplayPlaylist, 'id' | 'created_at' | 'updated_at'>): Promise<DisplayPlaylist | null> {
       const now = new Date().toISOString();
-      const newPlaylist: DisplayPlaylist = {
+      
+      if (playlistData.is_active) {
+        // Deactivate all others first
+        await supabase.from('display_playlists').update({ is_active: false }).neq('id', '0');
+      }
+
+      const { data, error } = await supabase.from('display_playlists').insert([{
         ...playlistData,
-        id: `pl-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         created_at: now,
         updated_at: now,
-      };
+      }]).select().single();
 
-      let updatedList = playlists;
-      if (newPlaylist.is_active) {
-        updatedList = playlists.map((p) => ({ ...p, is_active: false }));
+      if (error) {
+        console.error('Error adding display playlist:', error);
+        return null;
       }
-
-      updatedList = [newPlaylist, ...updatedList];
-      saveStoredPlaylists(updatedList);
-      return newPlaylist;
+      
+      return data;
     },
 
-    update(id: string, updates: Partial<DisplayPlaylist>): DisplayPlaylist | null {
-      const playlists = getStoredPlaylists();
-      const targetIndex = playlists.findIndex((p) => p.id === id);
-      if (targetIndex === -1) return null;
-
+    async update(id: string, updates: Partial<DisplayPlaylist>): Promise<DisplayPlaylist | null> {
       const now = new Date().toISOString();
-      let updatedList = playlists;
-
+      
       if (updates.is_active) {
-        updatedList = updatedList.map((p) => ({ ...p, is_active: p.id === id }));
+        await supabase.from('display_playlists').update({ is_active: false }).neq('id', '0');
       }
 
-      const updatedPlaylist: DisplayPlaylist = {
-        ...updatedList[targetIndex],
+      const { data, error } = await supabase.from('display_playlists').update({
         ...updates,
         updated_at: now,
-      };
+      }).eq('id', id).select().single();
 
-      updatedList[targetIndex] = updatedPlaylist;
-      saveStoredPlaylists(updatedList);
-      return updatedPlaylist;
+      if (error) {
+        console.error('Error updating display playlist:', error);
+        return null;
+      }
+      
+      return data;
     },
 
-    delete(id: string): boolean {
-      const playlists = getStoredPlaylists();
-      const filtered = playlists.filter((p) => p.id !== id);
-      if (filtered.length === playlists.length) return false;
-
-      if (playlists.find((p) => p.id === id)?.is_active && filtered.length > 0) {
-        filtered[0].is_active = true;
+    async delete(id: string): Promise<boolean> {
+      const { error } = await supabase.from('display_playlists').delete().eq('id', id);
+      if (error) {
+        console.error('Error deleting display playlist:', error);
+        return false;
       }
-
-      saveStoredPlaylists(filtered);
       return true;
     },
 
-    setActive(id: string): DisplayPlaylist | null {
+    async setActive(id: string): Promise<DisplayPlaylist | null> {
       return this.update(id, { is_active: true });
     },
   },

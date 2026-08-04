@@ -33,10 +33,10 @@ export default function AdminDashboardPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isDisplayPlaylistModalOpen, setIsDisplayPlaylistModalOpen] = useState(false);
 
-  const loadData = () => {
-    setSponsors(getSponsors());
-    setTournaments(getTournaments());
-    setPlaylist(getPlaylist());
+  const loadData = async () => {
+    setSponsors(await getSponsors());
+    setTournaments(await getTournaments());
+    setPlaylist(await getPlaylist());
   };
 
   // Load initial state & subscribe to real-time cross-platform updates
@@ -75,19 +75,19 @@ export default function AdminDashboardPage() {
   };
 
   // Handlers for storage updates
-  const handleSaveSponsors = (updated: Sponsor[]) => {
+  const handleSaveSponsors = async (updated: Sponsor[]) => {
     setSponsors(updated);
-    saveSponsors(updated);
+    await saveSponsors(updated);
   };
 
-  const handleSaveTournaments = (updated: Tournament[]) => {
+  const handleSaveTournaments = async (updated: Tournament[]) => {
     setTournaments(updated);
-    saveTournaments(updated);
+    await saveTournaments(updated);
   };
 
-  const handleSavePlaylist = (updated: PlaylistItem[]) => {
+  const handleSavePlaylist = async (updated: PlaylistItem[]) => {
     setPlaylist(updated);
-    savePlaylist(updated);
+    await savePlaylist(updated);
   };
 
   const handleLaunchDisplay = () => {

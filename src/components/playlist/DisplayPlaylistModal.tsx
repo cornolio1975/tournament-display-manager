@@ -121,13 +121,13 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
   const [formIsActive, setFormIsActive] = useState(false);
   const [formSlides, setFormSlides] = useState<DisplayPlaylistSlide[]>([]);
 
-  const loadData = () => {
-    const list = db.displayPlaylists.list();
+  const loadData = async () => {
+    const list = await db.displayPlaylists.list();
     setPlaylists(list);
 
     // Load saved database media & sponsors lists
-    const media = getPlaylist().filter((item) => !item.isDeleted && item.active);
-    const sps = getSponsors().filter((s) => !s.isDeleted && s.active);
+    const media = (await getPlaylist()).filter((item) => !item.isDeleted && item.active);
+    const sps = (await getSponsors()).filter((s) => !s.isDeleted && s.active);
     setDbMediaList(media);
     setDbSponsorsList(sps);
 
@@ -189,7 +189,7 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
     setIsEditing(true);
   };
 
-  const handleSaveForm = (e: React.FormEvent) => {
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
       addToast?.({ type: 'error', title: 'Missing Title', message: 'Please provide a playlist title.' });
@@ -203,7 +203,7 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
     const cleanedSlides = formSlides.map((s, idx) => ({ ...s, order: idx + 1 }));
 
     if (selectedPlaylistId && !selectedPlaylistId.startsWith('new-')) {
-      const updated = db.displayPlaylists.update(selectedPlaylistId, {
+      const updated = await db.displayPlaylists.update(selectedPlaylistId, {
         name: formName.trim(),
         description: formDescription.trim(),
         tatami: formTatami,
@@ -214,23 +214,25 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
         addToast?.({ type: 'success', title: 'Playlist Updated', message: `"${formName}" saved successfully.` });
       }
     } else {
-      const created = db.displayPlaylists.add({
+      const created = await db.displayPlaylists.add({
         name: formName.trim(),
         description: formDescription.trim(),
         tatami: formTatami,
         is_active: formIsActive,
         slides: cleanedSlides,
       });
-      setSelectedPlaylistId(created.id);
-      addToast?.({ type: 'success', title: 'Playlist Created', message: `"${formName}" created successfully.` });
+      if (created) {
+        setSelectedPlaylistId(created.id);
+        addToast?.({ type: 'success', title: 'Playlist Created', message: `"${formName}" created successfully.` });
+      }
     }
 
     setIsEditing(false);
-    loadData();
+    await loadData();
   };
 
-  const handleDelete = (id: string) => {
-    const success = db.displayPlaylists.delete(id);
+  const handleDelete = async (id: string) => {
+    const success = await db.displayPlaylists.delete(id);
     if (success) {
       addToast?.({ type: 'info', title: 'Playlist Removed', message: 'Display playlist deleted.' });
       setDeletingId(null);
@@ -238,14 +240,14 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
         setSelectedPlaylistId(null);
       }
       setIsEditing(false);
-      loadData();
+      await loadData();
     }
   };
 
-  const handleSetActive = (id: string) => {
-    db.displayPlaylists.setActive(id);
+  const handleSetActive = async (id: string) => {
+    await db.displayPlaylists.setActive(id);
     addToast?.({ type: 'success', title: 'Active Playlist Changed', message: 'Selected playlist set as primary display.' });
-    loadData();
+    await loadData();
   };
 
   const handleAddSlide = (type: DisplaySlideType) => {

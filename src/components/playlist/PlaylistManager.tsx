@@ -3,7 +3,17 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, ArrowUp, ArrowDown, Film, Image as ImageIcon, Video, Clock, Sparkles, X, RotateCcw, Repeat } from 'lucide-react';
 import { PlaylistItem, ToastMessage } from '@/lib/types';
-import { DEFAULT_PLAYLIST } from '@/lib/storage';
+const DEFAULT_PLAYLIST: PlaylistItem[] = [
+  {
+    id: 'default-1',
+    title: 'SP SPORTDATA Intro',
+    type: 'video',
+    url: '/intro.mp4',
+    duration: 20,
+    order: 1,
+    active: true,
+  }
+];
 import { StatusBadge } from '../ui/StatusBadge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';

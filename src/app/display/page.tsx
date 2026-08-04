@@ -216,10 +216,10 @@ export default function PublicDisplayPage() {
   }, [slideIndex]);
 
   // Load data & handle localStorage sync across tabs
-  const loadData = () => {
-    const activeSps = getSponsors().filter((s) => !s.isDeleted && s.active);
-    const activeTourn = getActiveTournament();
-    const activeMedia = getPlaylist().filter((p) => !p.isDeleted && p.active);
+  const loadData = async () => {
+    const activeSps = (await getSponsors()).filter((s) => !s.isDeleted && s.active);
+    const activeTourn = await getActiveTournament();
+    const activeMedia = (await getPlaylist()).filter((p) => !p.isDeleted && p.active);
 
     setSponsors(activeSps);
     setTournament(activeTourn);
@@ -228,7 +228,7 @@ export default function PublicDisplayPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const qPlaylistId = params.get('playlistId');
-      const allPlaylists = db.displayPlaylists.list();
+      const allPlaylists = await db.displayPlaylists.list();
 
       if (qPlaylistId) {
         const found = allPlaylists.find((p) => p.id === qPlaylistId);
@@ -850,9 +850,9 @@ export default function PublicDisplayPage() {
       <DisplayPlaylistModal
         isOpen={isPlaylistModalOpen}
         onClose={() => setIsPlaylistModalOpen(false)}
-        onLaunchPlaylist={(id) => {
+        onLaunchPlaylist={async (id) => {
           setIsPlaylistModalOpen(false);
-          const found = db.displayPlaylists.getById(id);
+          const found = await db.displayPlaylists.getById(id);
           if (found) {
             setActiveDisplayPlaylist(found);
             setSlideIndex(0);

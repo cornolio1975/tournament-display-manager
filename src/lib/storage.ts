@@ -1,350 +1,136 @@
 import { Sponsor, Tournament, PlaylistItem } from './types';
-import { setIndexedDBItem, getIndexedDBItem } from './idb';
-
-const SPONSORS_KEY = 'sp_tournament_sponsors_v2';
-const TOURNAMENTS_KEY = 'sp_tournament_details_v2';
-const PLAYLIST_KEY = 'sp_tournament_playlist_v2';
-
-// Cross-tab & Multi-window Broadcast Channel for real-time DB sync across platforms
-let broadcastChannel: BroadcastChannel | null = null;
-if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-  try {
-    broadcastChannel = new BroadcastChannel('karatetech_db_sync_channel');
-  } catch (err) {
-    console.warn('BroadcastChannel initialization warning:', err);
-  }
-}
+import { supabase } from './supabaseClient';
 
 // Helper to notify all platforms and open tabs
-export function broadcastDatabaseUpdate(type: 'sponsors' | 'tournaments' | 'playlist') {
+export function broadcastDatabaseUpdate(type: 'sponsors' | 'tournaments' | 'playlist' | 'display_playlists') {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(`ts_${type}_updated`));
-  window.dispatchEvent(new Event('storage'));
-  if (broadcastChannel) {
-    try {
-      broadcastChannel.postMessage({ type, timestamp: Date.now() });
-    } catch (e) {
-      console.warn('Broadcast message error:', e);
-    }
-  }
 }
 
-// In-memory cache for IndexedDB media strings (base64 data URLs)
-const mediaCache = new Map<string, string>();
-const pendingHydrations = new Set<string>();
-
-// Seed sample data for immediate visual impact
-export const DEFAULT_SPONSORS: Sponsor[] = [
-  {
-    id: 'sp-1',
-    name: 'SP SportData Solution',
-    logo: '/sp_logo.jpg',
-    website: 'https://spsportdatasolution.org',
-    order: 1,
-    active: true,
-  },
-  {
-    id: 'sp-2',
-    name: 'Senshi Martial Arts Gear',
-    logo: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?w=300&auto=format&fit=crop&q=80',
-    website: 'https://senshigear.example.com',
-    order: 2,
-    active: true,
-  },
-  {
-    id: 'sp-3',
-    name: 'Arax Energy Systems',
-    logo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&auto=format&fit=crop&q=80',
-    website: 'https://araxenergy.example.com',
-    order: 3,
-    active: true,
-  },
-  {
-    id: 'sp-4',
-    name: 'Global Martial Tech',
-    logo: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop&q=80',
-    website: 'https://globalmartialtech.org',
-    order: 4,
-    active: true,
-  },
-];
-
-export const DEFAULT_TOURNAMENTS: Tournament[] = [
-  {
-    id: 'tourn-1',
-    name: 'Karate Grand Prix Championship 2026',
-    organizer: 'SP SportData & WKF Federation',
-    date: '2026-08-15 - 2026-08-17',
-    venue: 'National Sports Complex Arena',
-    address: 'Bukit Jalil Sports City, 57000 Kuala Lumpur, Malaysia',
-    description: 'Premier international karate competition featuring top elite athletes competing in Kumite and Kata categories.',
-    logo: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?w=400&auto=format&fit=crop&q=80',
-    contactPerson: 'Master Tan Sri Alex',
-    phoneNumber: '+60 12-345 6789',
-    email: 'info@spsportdatasolution.org',
-    website: '/display',
-    facebookInstagram: '@karategrandprix2026',
-    active: true,
-  },
-  {
-    id: 'tourn-2',
-    name: 'Asian Junior Martial Arts Open',
-    organizer: 'Senshi Karate Academy',
-    date: '2026-11-10 - 2026-11-12',
-    venue: 'Indoors Stadium Center',
-    address: 'Persiaran Sukan, 40000 Shah Alam, Selangor',
-    description: 'Regional championship showcasing young emerging talents across Asia.',
-    logo: 'https://images.unsplash.com/photo-1517649763962-0c623266010b?w=400&auto=format&fit=crop&q=80',
-    contactPerson: 'Elena Rostova',
-    phoneNumber: '+60 17-987 6543',
-    email: 'contact@senshiopen.com',
-    website: '/display',
-    facebookInstagram: '@asianjuniorkarate',
-    active: false,
-  },
-];
-
-export const DEFAULT_PLAYLIST: PlaylistItem[] = [
-  {
-    id: 'media-1',
-    title: 'SP SPORTDATA SOLUTION Official 20s Intro',
-    type: 'video',
-    url: '/sp_sportdata_promo_20s.mp4',
-    duration: 20,
-    order: 1,
-    active: true,
-  },
-  {
-    id: 'media-2',
-    title: 'Championship Trophy & Medals Showcase',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=1200&auto=format&fit=crop&q=80',
-    duration: 10,
-    order: 2,
-    active: true,
-  },
-  {
-    id: 'media-3',
-    title: 'Sensei Kata Demonstration Highlights',
-    type: 'video',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    duration: 15,
-    order: 3,
-    active: true,
-  },
-  {
-    id: 'media-4',
-    title: 'Official Sponsors & Partners Wall',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=1200&auto=format&fit=crop&q=80',
-    duration: 8,
-    order: 4,
-    active: true,
-  },
-];
-
-const isClient = typeof window !== 'undefined';
-
-function hydrateMediaReference(idbKey: string) {
-  if (!isClient || mediaCache.has(idbKey) || pendingHydrations.has(idbKey)) return;
-  pendingHydrations.add(idbKey);
-  getIndexedDBItem(idbKey)
-    .then((resolvedUrl) => {
-      pendingHydrations.delete(idbKey);
-      if (resolvedUrl) {
-        mediaCache.set(idbKey, resolvedUrl);
-        window.dispatchEvent(new Event('storage'));
-      }
+// Set up Supabase Realtime listeners
+if (typeof window !== 'undefined') {
+  supabase
+    .channel('custom-all-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsors' }, () => {
+      broadcastDatabaseUpdate('sponsors');
     })
-    .catch((err) => {
-      pendingHydrations.delete(idbKey);
-      console.error(`Failed to hydrate media key ${idbKey}:`, err);
-    });
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, () => {
+      broadcastDatabaseUpdate('tournaments');
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'playlist_items' }, () => {
+      broadcastDatabaseUpdate('playlist');
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'display_playlists' }, () => {
+      broadcastDatabaseUpdate('display_playlists');
+    })
+    .subscribe();
 }
 
-function processMediaForSave<T extends { url?: string; logo?: string; id: string }>(
-  items: T[],
-  field: 'url' | 'logo'
-): T[] {
-  return items.map((item) => {
-    const val = item[field];
-    if (typeof val === 'string' && val.startsWith('data:')) {
-      const idbKey = `idb_media_${item.id}_${field}`;
-      mediaCache.set(idbKey, val);
-      setIndexedDBItem(idbKey, val);
-      return { ...item, [field]: idbKey };
+// Helper for Base64 image/video uploads to Supabase Storage
+async function uploadMediaIfDataUrl(dataUrl: string, folder: string): Promise<string> {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return dataUrl;
+  try {
+    const arr = dataUrl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return dataUrl;
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
     }
-    return item;
-  });
-}
+    const blob = new Blob([u8arr], { type: mime });
+    const ext = mime.split('/')[1] || 'bin';
+    const filename = `${folder}_${Date.now()}.${ext}`;
 
-function resolveMediaForLoad<T extends { url?: string; logo?: string }>(
-  items: T[],
-  field: 'url' | 'logo'
-): T[] {
-  return items.map((item) => {
-    const val = item[field];
-    if (typeof val === 'string' && val.startsWith('idb_media_')) {
-      if (mediaCache.has(val)) {
-        return { ...item, [field]: mediaCache.get(val)! };
-      }
-      hydrateMediaReference(val);
+    const { error } = await supabase.storage.from('media').upload(filename, blob, { contentType: mime });
+    if (error) {
+      console.error('Storage upload error:', error);
+      return dataUrl;
     }
-    return item;
-  });
+    const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(filename);
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.error('Media upload fallback error:', err);
+    return dataUrl;
+  }
 }
 
 // --- SPONSOR STORAGE ---
-export function getSponsors(): Sponsor[] {
-  if (!isClient) return DEFAULT_SPONSORS;
-  try {
-    const data = localStorage.getItem(SPONSORS_KEY);
-    if (!data) {
-      try {
-        localStorage.setItem(SPONSORS_KEY, JSON.stringify(DEFAULT_SPONSORS));
-      } catch (err) {
-        console.warn('LocalStorage save initial sponsors warning:', err);
-      }
-      return DEFAULT_SPONSORS;
-    }
-    const parsed: Sponsor[] = JSON.parse(data);
-    return resolveMediaForLoad(parsed, 'logo');
-  } catch (err) {
-    console.error('Failed to load sponsors:', err);
-    return DEFAULT_SPONSORS;
+export async function getSponsors(): Promise<Sponsor[]> {
+  const { data, error } = await supabase.from('sponsors').select('*').order('order', { ascending: true });
+  if (error) {
+    console.error('Failed to load sponsors:', error);
+    return [];
   }
+  return data || [];
 }
 
-export function saveSponsors(sponsors: Sponsor[]): void {
-  if (!isClient) return;
-  try {
-    const processed = processMediaForSave(sponsors, 'logo');
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify(processed));
-    broadcastDatabaseUpdate('sponsors');
-  } catch (err) {
-    console.warn('LocalStorage full, offloading all logos to IndexedDB...', err);
-    try {
-      const forceProcessed = sponsors.map((s) => {
-        if (s.logo && s.logo.length > 500) {
-          const idbKey = `idb_media_${s.id}_logo`;
-          mediaCache.set(idbKey, s.logo);
-          setIndexedDBItem(idbKey, s.logo);
-          return { ...s, logo: idbKey };
-        }
-        return s;
-      });
-      localStorage.setItem(SPONSORS_KEY, JSON.stringify(forceProcessed));
-      broadcastDatabaseUpdate('sponsors');
-    } catch (quotaErr) {
-      console.error('Critical quota error saving sponsors:', quotaErr);
-    }
-  }
+export async function saveSponsors(sponsors: Sponsor[]): Promise<void> {
+  const processed = await Promise.all(
+    sponsors.map(async (s) => ({
+      ...s,
+      logo: await uploadMediaIfDataUrl(s.logo, 'sponsor'),
+    }))
+  );
+  const { error } = await supabase.from('sponsors').upsert(processed);
+  if (error) console.error('Failed to save sponsors:', error);
 }
 
 // --- TOURNAMENT STORAGE ---
-export function getTournaments(): Tournament[] {
-  if (!isClient) return DEFAULT_TOURNAMENTS;
-  try {
-    const data = localStorage.getItem(TOURNAMENTS_KEY);
-    if (!data) {
-      try {
-        localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(DEFAULT_TOURNAMENTS));
-      } catch (err) {
-        console.warn('LocalStorage save initial tournaments warning:', err);
-      }
-      return DEFAULT_TOURNAMENTS;
-    }
-    const list: Tournament[] = JSON.parse(data);
-    let modified = false;
-    const sanitized = list.map((t) => {
-      if (!t.website || t.website.includes('display.spsportdatasolution.org')) {
-        modified = true;
-        return { ...t, website: '/display' };
-      }
-      return t;
-    });
-    if (modified) {
-      try {
-        localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(sanitized));
-      } catch (err) {
-        console.warn('LocalStorage update tournament warning:', err);
-      }
-    }
-    return resolveMediaForLoad(sanitized, 'logo');
-  } catch (err) {
-    console.error('Failed to load tournaments:', err);
-    return DEFAULT_TOURNAMENTS;
+export async function getTournaments(): Promise<Tournament[]> {
+  const { data, error } = await supabase.from('tournaments').select('*').order('created_at', { ascending: false });
+  if (error) {
+    console.error('Failed to load tournaments:', error);
+    return [];
   }
+  return data || [];
 }
 
-export function saveTournaments(tournaments: Tournament[]): void {
-  if (!isClient) return;
-  try {
-    const processed = processMediaForSave(tournaments, 'logo');
-    localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(processed));
-    broadcastDatabaseUpdate('tournaments');
-  } catch (err) {
-    console.error('Failed to save tournaments:', err);
-  }
+export async function saveTournaments(tournaments: Tournament[]): Promise<void> {
+  const processed = await Promise.all(
+    tournaments.map(async (t) => ({
+      ...t,
+      logo: await uploadMediaIfDataUrl(t.logo, 'tournament'),
+    }))
+  );
+  const { error } = await supabase.from('tournaments').upsert(processed);
+  if (error) console.error('Failed to save tournaments:', error);
 }
 
-export function getActiveTournament(): Tournament | null {
-  const list = getTournaments().filter((t) => !t.isDeleted);
-  return list.find((t) => t.active) || list[0] || null;
+export async function getActiveTournament(): Promise<Tournament | null> {
+  const { data, error } = await supabase
+    .from('tournaments')
+    .select('*')
+    .eq('active', true)
+    .eq('is_deleted', false)
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error loading active tournament:', error);
+  }
+  return data || null;
 }
 
 // --- PLAYLIST STORAGE ---
-export function getPlaylist(): PlaylistItem[] {
-  if (!isClient) return DEFAULT_PLAYLIST;
-  try {
-    const data = localStorage.getItem(PLAYLIST_KEY);
-    if (!data) {
-      try {
-        localStorage.setItem(PLAYLIST_KEY, JSON.stringify(DEFAULT_PLAYLIST));
-      } catch (err) {
-        console.warn('LocalStorage save initial playlist warning:', err);
-      }
-      return DEFAULT_PLAYLIST;
-    }
-    const list: PlaylistItem[] = JSON.parse(data);
-    if (!list.some((item) => item.url === '/sp_sportdata_promo_20s.mp4')) {
-      const updated = [DEFAULT_PLAYLIST[0], ...list.filter((item) => item.id !== 'media-1')];
-      try {
-        localStorage.setItem(PLAYLIST_KEY, JSON.stringify(updated));
-      } catch (err) {
-        console.warn('LocalStorage item update warning:', err);
-      }
-      return resolveMediaForLoad(updated, 'url');
-    }
-    return resolveMediaForLoad(list, 'url');
-  } catch (err) {
-    console.error('Failed to load playlist:', err);
-    return DEFAULT_PLAYLIST;
+export async function getPlaylist(): Promise<PlaylistItem[]> {
+  const { data, error } = await supabase.from('playlist_items').select('*').order('order', { ascending: true });
+  if (error) {
+    console.error('Failed to load playlist:', error);
+    return [];
   }
+  return data || [];
 }
 
-export function savePlaylist(items: PlaylistItem[]): void {
-  if (!isClient) return;
-  try {
-    const processed = processMediaForSave(items, 'url');
-    localStorage.setItem(PLAYLIST_KEY, JSON.stringify(processed));
-    broadcastDatabaseUpdate('playlist');
-  } catch (err) {
-    console.warn('Quota warning saving playlist to LocalStorage. Offloading heavy URLs to IndexedDB...', err);
-    try {
-      const forceProcessed = items.map((item) => {
-        if (item.url && item.url.length > 500) {
-          const idbKey = `idb_media_${item.id}_url`;
-          mediaCache.set(idbKey, item.url);
-          setIndexedDBItem(idbKey, item.url);
-          return { ...item, url: idbKey };
-        }
-        return item;
-      });
-      localStorage.setItem(PLAYLIST_KEY, JSON.stringify(forceProcessed));
-      broadcastDatabaseUpdate('playlist');
-    } catch (quotaErr) {
-      console.error('Critical quota error saving playlist:', quotaErr);
-    }
-  }
+export async function savePlaylist(items: PlaylistItem[]): Promise<void> {
+  const processed = await Promise.all(
+    items.map(async (item) => ({
+      ...item,
+      url: await uploadMediaIfDataUrl(item.url, 'playlist'),
+    }))
+  );
+  const { error } = await supabase.from('playlist_items').upsert(processed);
+  if (error) console.error('Failed to save playlist:', error);
 }
