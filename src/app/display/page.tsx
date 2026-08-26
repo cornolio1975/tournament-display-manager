@@ -4,108 +4,164 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
   Pause,
-  Volume2,
-  VolumeX,
   Maximize2,
   Minimize2,
   X,
   Trophy,
-  Shield,
-  Film,
-  Sparkles,
   MapPin,
   Calendar,
-  Repeat,
   SkipForward,
   SkipBack,
-  Scaling,
-  ZoomIn,
-  ZoomOut,
-  Layers,
   Clock,
   Radio,
-  UserCheck,
-  Award,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
-  MonitorPlay,
   ListOrdered,
   ArrowDownCircle,
+  Activity,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  AlertCircle,
+  Send,
+  RefreshCw,
 } from 'lucide-react';
 import { getSponsors, getActiveTournament, getPlaylist } from '@/lib/storage';
-import { Sponsor, Tournament, PlaylistItem } from '@/lib/types';
+import { Sponsor, Tournament, PlaylistItem, LiveMatchData, BridgeConnectionStatus } from '@/lib/types';
+import {
+  subscribeLiveMatchRealtime,
+  getBridgeDiagnosticInfo,
+  getInitialLiveMatchData,
+  getLiveMatchDataByBoutId,
+  sendBridgeTestMessage,
+} from '@/lib/karateTechBridge';
 import { db } from '@/db/dbClient';
 import { DisplayPlaylist, DisplayPlaylistSlide } from '@/db/types';
 import { SpLogo } from '@/components/ui/SpLogo';
-import { TournamentBannerModal } from '@/components/display/TournamentBannerModal';
 import { DisplayPlaylistModal } from '@/components/playlist/DisplayPlaylistModal';
+import { supabase } from '@/lib/supabaseClient';
 
-// --- SAMPLE REAL-TIME DEMO DATA FOR DISPLAY SLIDES ---
-const DEMO_KUMITE = {
-  category: 'Male Senior Kumite -75kg',
-  round: 'FINALS - BOUT #42',
+// --- INITIAL LIVE KUMITE PLACEHOLDER STATE ---
+const INITIAL_KUMITE: LiveMatchData = {
+  category: 'Waiting for KarateTech live data',
+  round: 'Standby',
   tatami: 'Tatami 1',
-  matchTime: '01:45',
+  matchTime: '03:00',
   aka: {
-    name: 'A. HAROUN',
-    country: 'MAS',
-    club: 'Senshi Karate Team',
-    score: 4,
-    senshu: true,
-    fouls: ['C1', 'C2'],
+    name: 'AKA ATHLETE',
+    country: '',
+    club: '',
+    score: 0,
+    senshu: false,
+    fouls: [],
   },
   ao: {
-    name: 'K. STANISLAV',
-    country: 'KAZ',
-    club: 'Kazakhstan National',
-    score: 2,
+    name: 'AO ATHLETE',
+    country: '',
+    club: '',
+    score: 0,
     senshu: false,
-    fouls: ['C1'],
+    fouls: [],
   },
+  lastEvent: 'NO_LIVE_DATA_YET',
+  lastMessageTime: '--:--:--',
 };
 
-const DEMO_KATA_JUDGES = [
-  { name: 'J1 (JPN)', score: 8.4 },
-  { name: 'J2 (FRA)', score: 8.2 },
-  { name: 'J3 (ITA)', score: 8.6 },
-  { name: 'J4 (TUR)', score: 8.0 },
-  { name: 'J5 (MAS)', score: 8.4 },
-  { name: 'J6 (ESP)', score: 8.6 },
-  { name: 'J7 (USA)', score: 8.2 },
-];
+type KataJudgeCell = {
+  name: string;
+  score: number | null;
+};
 
-const DEMO_BRACKETS = [
-  { id: 'b1', round: 'Quarterfinal 1', red: 'T. MORIMOTO (JPN)', blue: 'R. KAZIM (AZE)', score: '4 - 1', winner: 'red' },
-  { id: 'b2', round: 'Quarterfinal 2', red: 'A. HAROUN (MAS)', blue: 'J. SMITH (USA)', score: '5 - 0', winner: 'red' },
-  { id: 'b3', round: 'Quarterfinal 3', red: 'K. STANISLAV (KAZ)', blue: 'L. MARTINEZ (ARG)', score: '3 - 2', winner: 'red' },
-  { id: 'b4', round: 'Quarterfinal 4', red: 'M. ROSSI (ITA)', blue: 'H. ALI (EGY)', score: '2 - 0', winner: 'red' },
-  { id: 'b5', round: 'Semifinal 1', red: 'A. HAROUN (MAS)', blue: 'T. MORIMOTO (JPN)', score: '3 - 1', winner: 'red' },
-  { id: 'b6', round: 'Semifinal 2', red: 'K. STANISLAV (KAZ)', blue: 'M. ROSSI (ITA)', score: '4 - 2', winner: 'red' },
-  { id: 'b7', round: 'GOLD MEDAL MATCH', red: 'A. HAROUN (MAS)', blue: 'K. STANISLAV (KAZ)', score: '4 - 2 (LIVE)', winner: 'live' },
-];
+type BracketRow = {
+  id: string;
+  round: string;
+  red: string;
+  blue: string;
+  score: string;
+  winner: 'red' | 'blue' | 'live' | 'none';
+};
 
-const DEMO_MEDALS = [
-  { rank: 1, team: 'Malaysia National Karate Federation', gold: 6, silver: 4, bronze: 5, total: 15 },
-  { rank: 2, team: 'Senshi Martial Arts Academy', gold: 5, silver: 4, bronze: 3, total: 12 },
-  { rank: 3, team: 'Japan Elite Karate Team', gold: 4, silver: 6, bronze: 4, total: 14 },
-  { rank: 4, team: 'Kazakhstan National Club', gold: 3, silver: 2, bronze: 6, total: 11 },
-  { rank: 5, team: 'French Federation Karate', gold: 2, silver: 3, bronze: 4, total: 9 },
-  { rank: 6, team: 'Italian Combat Sports Center', gold: 2, silver: 2, bronze: 5, total: 9 },
-  { rank: 7, team: 'Spain National Team', gold: 1, silver: 3, bronze: 2, total: 6 },
-];
+type StandingsRow = {
+  rank: number;
+  team: string;
+  wins: number;
+  played: number;
+  scored: number;
+  total: number;
+};
 
-const DEMO_SCHEDULE = [
-  { bout: 36, category: 'Male Cadet Kata', red: 'S. KUMAR (IND)', blue: 'T. LEE (KOR)', tatami: 'Tatami 1', status: 'Completed' },
-  { bout: 37, category: 'Female Junior Kumite -53kg', red: 'M. PETROVA (BUL)', blue: 'K. CHEN (TPE)', tatami: 'Tatami 2', status: 'Completed' },
-  { bout: 38, category: 'Female Senior Kata', red: 'Y. SHIMIZU (JPN)', blue: 'L. SANCHEZ (ESP)', tatami: 'Tatami 2', status: 'Completed' },
-  { bout: 39, category: 'Male Senior Kumite -67kg', red: 'C. DANIEL (MAS)', blue: 'V. CHEN (TPE)', tatami: 'Tatami 1', status: 'Completed' },
-  { bout: 40, category: 'Female Kumite -55kg', red: 'S. GORANOVA (BUL)', blue: 'A. TERLIUGA (UKR)', tatami: 'Tatami 2', status: 'In Progress' },
-  { bout: 41, category: 'Male Senior Kumite -75kg', red: 'A. HAROUN (MAS)', blue: 'K. STANISLAV (KAZ)', tatami: 'Tatami 1', status: 'ON DECK' },
-  { bout: 42, category: 'Male Senior Kumite +84kg', red: 'T. KVESIC (CRO)', blue: 'G. ARKANia (GEO)', tatami: 'Tatami 1', status: 'Upcoming' },
-  { bout: 43, category: 'Female Senior Kumite +68kg', red: 'E. QUIRICI (SUI)', blue: 'I. ZARETSKA (AZE)', tatami: 'Tatami 2', status: 'Upcoming' },
-  { bout: 44, category: 'Male Senior Kata Final', red: 'K. MORIMOTO (JPN)', blue: 'D. QUINTERO (ESP)', tatami: 'Tatami 1', status: 'Upcoming' },
-];
+type ScheduleRow = {
+  id: string;
+  bout: number;
+  category: string;
+  red: string;
+  blue: string;
+  tatami: string;
+  status: string;
+};
+
+function isPlaceholderAthleteName(name?: string): boolean {
+  if (!name) return true;
+  const normalized = name.trim().toUpperCase();
+  return normalized === 'AKA ATHLETE' || normalized === 'AO ATHLETE';
+}
+
+function isPlaceholderCategory(category?: string): boolean {
+  if (!category) return true;
+  const normalized = category.trim().toLowerCase();
+  return normalized === 'kumite senior' || normalized === 'male senior kumite' || normalized === 'waiting for karatetech live data';
+}
+
+function mergeLiveMatchForSameMatch(previous: LiveMatchData, incoming: LiveMatchData): LiveMatchData {
+  const sameMatch = !!previous.matchId && !!incoming.matchId && previous.matchId === incoming.matchId;
+  if (!sameMatch) return incoming;
+
+  return {
+    ...previous,
+    ...incoming,
+    category: isPlaceholderCategory(incoming.category) ? previous.category : incoming.category,
+    round: incoming.round || previous.round,
+    tatami: incoming.tatami || previous.tatami,
+    aka: {
+      ...previous.aka,
+      ...incoming.aka,
+      name: isPlaceholderAthleteName(incoming.aka.name) ? previous.aka.name : incoming.aka.name,
+      club: incoming.aka.club || previous.aka.club,
+      country: incoming.aka.country || previous.aka.country,
+      fouls: incoming.aka.fouls?.length ? incoming.aka.fouls : previous.aka.fouls,
+    },
+    ao: {
+      ...previous.ao,
+      ...incoming.ao,
+      name: isPlaceholderAthleteName(incoming.ao.name) ? previous.ao.name : incoming.ao.name,
+      club: incoming.ao.club || previous.ao.club,
+      country: incoming.ao.country || previous.ao.country,
+      fouls: incoming.ao.fouls?.length ? incoming.ao.fouls : previous.ao.fouls,
+    },
+  };
+}
+
+function hasMeaningfulPinnedData(data: LiveMatchData | null): data is LiveMatchData {
+  if (!data) return false;
+  const hasParticipantIds = !!data.participantAId || !!data.participantBId;
+  const hasRealNames = !isPlaceholderAthleteName(data.aka.name) || !isPlaceholderAthleteName(data.ao.name);
+  const hasLiveScore = (data.aka.score ?? 0) !== 0 || (data.ao.score ?? 0) !== 0;
+  const hasTimerSignal = !!data.timerActive;
+  return hasParticipantIds || hasRealNames || hasLiveScore || hasTimerSignal;
+}
+
+function normalizeTatamiLabel(raw?: string | null): string {
+  if (!raw) return 'Tatami TBD';
+  return raw.toLowerCase().includes('tatami') ? raw : `Tatami ${raw}`;
+}
+
+function getStatusPriority(status?: string): number {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized.includes('running') || normalized.includes('progress') || normalized.includes('live')) return 0;
+  if (normalized.includes('on deck')) return 1;
+  if (normalized.includes('scheduled') || normalized.includes('upcoming')) return 2;
+  if (normalized.includes('completed')) return 3;
+  if (normalized.includes('walkover')) return 4;
+  return 5;
+}
 
 export default function PublicDisplayPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -118,13 +174,28 @@ export default function PublicDisplayPage() {
   const [slideTimeRemaining, setSlideTimeRemaining] = useState<number>(15);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
 
+  // Live Match State & Diagnostics
+  const [liveMatch, setLiveMatch] = useState<LiveMatchData>(INITIAL_KUMITE);
+  const [hasLiveMatch, setHasLiveMatch] = useState<boolean>(false);
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeConnectionStatus>('CONNECTING');
+  // Safe static default — getBridgeDiagnosticInfo() reads process.env and must NOT be called
+  // during useState() as that runs during SSR, causing server/client hydration mismatch.
+  const [bridgeDiagnostic, setBridgeDiagnostic] = useState<ReturnType<typeof getBridgeDiagnosticInfo>>({
+    supabaseUrl: '',
+    wsUrl: '',
+    status: 'CONNECTING' as BridgeConnectionStatus,
+    lastReceivedEvent: 'NONE',
+    lastReceivedTime: '--:--:--',
+    lastReceivedData: null,
+  });
+  const [showDiagnosticPanel, setShowDiagnosticPanel] = useState<boolean>(false);
+  const [testLogMessage, setTestLogMessage] = useState<string>('');
+
   // Playback & UI controls
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isLoopingAll, setIsLoopingAll] = useState(true);
-  const [showBanner, setShowBanner] = useState(false);
 
   // Screen Sizing & Zoom Controls
   const [fitMode, setFitMode] = useState<'cover' | 'contain' | 'fill'>('cover');
@@ -132,10 +203,128 @@ export default function PublicDisplayPage() {
 
   // Auto-scroll State
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
+  const [forcedBoutId, setForcedBoutId] = useState<string | null>(null);
+  const [enforceForcedBoutId, setEnforceForcedBoutId] = useState<boolean>(false);
+  const [kataTitle, setKataTitle] = useState<string>('WKF KATA SCOREBOARD');
+  const [kataAthlete, setKataAthlete] = useState<string>('Awaiting Kata Athlete');
+  const [kataAthleteMeta, setKataAthleteMeta] = useState<string>('No judge feed exposed by source yet');
+  const [kataJudges, setKataJudges] = useState<KataJudgeCell[]>(
+    Array.from({ length: 7 }, (_, idx) => ({ name: `J${idx + 1}`, score: null }))
+  );
+  const [kataTotalScore, setKataTotalScore] = useState<number | null>(null);
+  const [bracketTitle, setBracketTitle] = useState<string>('Live Category Brackets');
+  const [bracketRows, setBracketRows] = useState<BracketRow[]>([]);
+  const [standingsRows, setStandingsRows] = useState<StandingsRow[]>([]);
+  const [scheduleRows, setScheduleRows] = useState<ScheduleRow[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const slideContainerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentSlide: DisplayPlaylistSlide | undefined = activeDisplayPlaylist?.slides[slideIndex];
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const qBoutId = params.get('boutId');
+    setForcedBoutId(qBoutId || null);
+  }, []);
+
+  // Subscribe to KarateTech Realtime Live Match Broadcast & Table Updates
+  useEffect(() => {
+    let cancelled = false;
+
+    // Populate bridgeDiagnostic on the client where process.env is safe to read
+    setBridgeDiagnostic(getBridgeDiagnosticInfo());
+
+    void (async () => {
+      let initial: LiveMatchData | null = null;
+      if (forcedBoutId) {
+        const pinned = await getLiveMatchDataByBoutId(forcedBoutId);
+        if (hasMeaningfulPinnedData(pinned)) {
+          setEnforceForcedBoutId(true);
+          initial = pinned;
+        } else {
+          setEnforceForcedBoutId(false);
+          initial = await getInitialLiveMatchData();
+        }
+      } else {
+        setEnforceForcedBoutId(false);
+        initial = await getInitialLiveMatchData();
+      }
+      if (cancelled || !initial) return;
+      setLiveMatch(initial);
+      setHasLiveMatch(true);
+      setBridgeDiagnostic(getBridgeDiagnosticInfo());
+    })();
+
+    const poll = setInterval(() => {
+      void (async () => {
+        let latest: LiveMatchData | null = null;
+        if (forcedBoutId && enforceForcedBoutId) {
+          const pinned = await getLiveMatchDataByBoutId(forcedBoutId);
+          latest = hasMeaningfulPinnedData(pinned) ? pinned : await getInitialLiveMatchData();
+        } else {
+          latest = await getInitialLiveMatchData();
+        }
+        if (cancelled || !latest) return;
+
+        if (forcedBoutId && enforceForcedBoutId && latest.matchId && latest.matchId !== forcedBoutId) {
+          return;
+        }
+
+        const currentTatami = currentSlide?.tatami_filter || activeDisplayPlaylist?.tatami || 'ALL';
+        if (currentTatami !== 'ALL' && latest.tatami && latest.tatami.toLowerCase() !== currentTatami.toLowerCase()) {
+          return;
+        }
+
+        setLiveMatch((prev) => mergeLiveMatchForSameMatch(prev, latest));
+        setHasLiveMatch(true);
+        setBridgeDiagnostic(getBridgeDiagnosticInfo());
+      })();
+    }, 5000);
+
+    console.info('[DISPLAY] Initializing KarateTech Realtime Live Match subscription...');
+    
+    const unsub = subscribeLiveMatchRealtime(
+      (data: LiveMatchData) => {
+        console.info('[DISPLAY] EVENT RECEIVED:', data);
+
+        if (forcedBoutId && enforceForcedBoutId && data.matchId && data.matchId !== forcedBoutId) {
+          console.info(`[DISPLAY] EVENT FILTERED OUT: match '${data.matchId}' does not match forced bout '${forcedBoutId}'`);
+          setBridgeDiagnostic(getBridgeDiagnosticInfo());
+          return;
+        }
+        
+        // Filter by Tatami if slide has a specific filter
+        const currentTatami = currentSlide?.tatami_filter || activeDisplayPlaylist?.tatami || 'ALL';
+        console.info(`[DISPLAY] Filtering check: Incoming Tatami='${data.tatami}', Current Display Tatami='${currentTatami}'`);
+        
+        if (currentTatami !== 'ALL' && data.tatami && data.tatami.toLowerCase() !== currentTatami.toLowerCase()) {
+          console.info(`[DISPLAY] EVENT FILTERED OUT: tatami '${data.tatami}' does not match '${currentTatami}'`);
+          setBridgeDiagnostic(getBridgeDiagnosticInfo());
+          return;
+        }
+
+        setLiveMatch((prev) => mergeLiveMatchForSameMatch(prev, data));
+        setHasLiveMatch(true);
+        setBridgeDiagnostic(getBridgeDiagnosticInfo());
+        console.info('[DISPLAY] STATE UPDATED -> Scoreboard UI updated with live match data');
+      },
+      (status, info) => {
+        setBridgeStatus(status);
+        setBridgeDiagnostic(getBridgeDiagnosticInfo());
+        console.info(`[DISPLAY] Bridge Connection Status Changed: ${status}`, info);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+      console.info('[DISPLAY] Cleaning up KarateTech Realtime Live Match subscription');
+      unsub();
+    };
+  }, [currentSlide, activeDisplayPlaylist, forcedBoutId, enforceForcedBoutId]);
 
   // Load screen config
   useEffect(() => {
@@ -147,48 +336,9 @@ export default function PublicDisplayPage() {
         if (parsed.zoomLevel) setZoomLevel(parsed.zoomLevel);
       }
     } catch (e) {
-      console.error(e);
+      console.error('[DISPLAY] Error loading screen config:', e);
     }
   }, []);
-
-  const updateScreenConfig = (newFit?: 'cover' | 'contain' | 'fill', newZoom?: number) => {
-    const targetFit = newFit !== undefined ? newFit : fitMode;
-    const targetZoom = newZoom !== undefined ? newZoom : zoomLevel;
-    if (newFit !== undefined) setFitMode(newFit);
-    if (newZoom !== undefined) setZoomLevel(newZoom);
-    try {
-      localStorage.setItem('sp_display_screen_config', JSON.stringify({ fitMode: targetFit, zoomLevel: targetZoom }));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const cycleFitMode = () => {
-    const modes: ('cover' | 'contain' | 'fill')[] = ['cover', 'contain', 'fill'];
-    const nextIdx = (modes.indexOf(fitMode) + 1) % modes.length;
-    updateScreenConfig(modes[nextIdx], zoomLevel);
-  };
-
-  const handleZoomIn = () => {
-    if (zoomLevel < 180) updateScreenConfig(fitMode, zoomLevel + 10);
-  };
-
-  const handleZoomOut = () => {
-    if (zoomLevel > 50) updateScreenConfig(fitMode, zoomLevel - 10);
-  };
-
-  // Scroll Actions for Active Display Target
-  const handleScrollDown = () => {
-    if (slideContainerRef.current) {
-      slideContainerRef.current.scrollBy({ top: 320, behavior: 'smooth' });
-    }
-  };
-
-  const handleScrollUp = () => {
-    if (slideContainerRef.current) {
-      slideContainerRef.current.scrollBy({ top: -320, behavior: 'smooth' });
-    }
-  };
 
   // Auto-scroll loop for long schedule/bracket tables
   useEffect(() => {
@@ -217,29 +367,33 @@ export default function PublicDisplayPage() {
 
   // Load data & handle localStorage sync across tabs
   const loadData = async () => {
-    const activeSps = (await getSponsors()).filter((s) => !s.isDeleted && s.active);
-    const activeTourn = await getActiveTournament();
-    const activeMedia = (await getPlaylist()).filter((p) => !p.isDeleted && p.active);
+    try {
+      const activeSps = (await getSponsors()).filter((s) => !s.isDeleted && s.active);
+      const activeTourn = await getActiveTournament();
+      const activeMedia = (await getPlaylist()).filter((p) => !p.isDeleted && p.active);
 
-    setSponsors(activeSps);
-    setTournament(activeTourn);
-    setLegacyPlaylist(activeMedia);
+      setSponsors(activeSps);
+      setTournament(activeTourn);
+      setLegacyPlaylist(activeMedia);
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const qPlaylistId = params.get('playlistId');
-      const allPlaylists = await db.displayPlaylists.list();
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const qPlaylistId = params.get('playlistId');
+        const allPlaylists = await db.displayPlaylists.list();
 
-      if (qPlaylistId) {
-        const found = allPlaylists.find((p) => p.id === qPlaylistId);
-        if (found) {
-          setActiveDisplayPlaylist(found);
-          return;
+        if (qPlaylistId) {
+          const found = allPlaylists.find((p) => p.id === qPlaylistId);
+          if (found) {
+            setActiveDisplayPlaylist(found);
+            return;
+          }
         }
-      }
 
-      const activeDB = allPlaylists.find((p) => p.is_active) || allPlaylists[0] || null;
-      setActiveDisplayPlaylist(activeDB);
+        const activeDB = allPlaylists.find((p) => p.is_active) || allPlaylists[0] || null;
+        setActiveDisplayPlaylist(activeDB);
+      }
+    } catch (err) {
+      console.error('[DISPLAY] Error loading display data:', err);
     }
   };
 
@@ -265,19 +419,256 @@ export default function PublicDisplayPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDerivedSlidesData = async () => {
+      try {
+        const { data: bouts, error: boutsError } = await supabase
+          .from('bouts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(300);
+
+        if (boutsError || !bouts) return;
+
+        const rows = bouts as Array<Record<string, any>>;
+        const participantIds = Array.from(
+          new Set(
+            rows
+              .flatMap((row) => [row.participant_a_id, row.participant_b_id])
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+        const categoryIds = Array.from(
+          new Set(rows.map((row) => row.category_id).filter((id): id is string => Boolean(id)))
+        );
+
+        const { data: participants } = participantIds.length
+          ? await supabase.from('participants').select('id,full_name,club_id,nationality_code').in('id', participantIds)
+          : { data: [] as Array<Record<string, any>> };
+
+        const clubIds = Array.from(
+          new Set((participants || []).map((p: any) => p.club_id).filter((id: any): id is string => Boolean(id)))
+        );
+
+        const { data: clubs } = clubIds.length
+          ? await supabase.from('clubs').select('id,name').in('id', clubIds)
+          : { data: [] as Array<Record<string, any>> };
+
+        const { data: categories } = categoryIds.length
+          ? await supabase.from('categories').select('id,name').in('id', categoryIds)
+          : { data: [] as Array<Record<string, any>> };
+
+        if (cancelled) return;
+
+        const participantMap = new Map<string, Record<string, any>>((participants || []).map((p: any) => [p.id, p]));
+        const clubMap = new Map<string, string>((clubs || []).map((c: any) => [c.id, c.name]));
+        const categoryMap = new Map<string, string>((categories || []).map((c: any) => [c.id, c.name]));
+
+        const formatFighter = (participantId?: string | null, fallback?: string) => {
+          if (!participantId) return fallback || 'TBD ATHLETE';
+          const p = participantMap.get(participantId);
+          if (!p) return fallback || 'TBD ATHLETE';
+          const name = String(p.full_name || fallback || 'TBD ATHLETE').toUpperCase();
+          const country = String(p.nationality_code || '').trim();
+          return country ? `${name} (${country})` : name;
+        };
+
+        const tatamiFilter = currentSlide?.tatami_filter || activeDisplayPlaylist?.tatami || 'ALL';
+        const filteredByTatami = rows.filter((row) => {
+          if (tatamiFilter === 'ALL') return true;
+          if (!row.tatami) return false;
+          return normalizeTatamiLabel(String(row.tatami)).toLowerCase() === tatamiFilter.toLowerCase();
+        });
+
+        const sortedForQueue = [...(filteredByTatami.length ? filteredByTatami : rows)].sort((a, b) => {
+          const statusCompare = getStatusPriority(a.status) - getStatusPriority(b.status);
+          if (statusCompare !== 0) return statusCompare;
+          return Date.parse(String(b.created_at || 0)) - Date.parse(String(a.created_at || 0));
+        });
+
+        setScheduleRows(
+          sortedForQueue.slice(0, 12).map((row) => ({
+            id: String(row.id),
+            bout: Number(row.bout_no || 0),
+            category: categoryMap.get(String(row.category_id || '')) || 'Category TBD',
+            red: formatFighter(row.participant_a_id),
+            blue: formatFighter(row.participant_b_id),
+            tatami: normalizeTatamiLabel(row.tatami),
+            status: String(row.status || 'Scheduled'),
+          }))
+        );
+
+        const selectedCategoryId = (() => {
+          if (currentSlide?.category_filter) {
+            const filter = currentSlide.category_filter.toLowerCase();
+            const found = [...categoryMap.entries()].find(([, name]) => name.toLowerCase().includes(filter));
+            if (found) return found[0];
+          }
+          if (liveMatch.categoryId) return liveMatch.categoryId;
+          const running = rows.find((row) => getStatusPriority(row.status) === 0);
+          return running?.category_id ? String(running.category_id) : null;
+        })();
+
+        const bracketSource = selectedCategoryId
+          ? rows.filter((row) => String(row.category_id || '') === selectedCategoryId)
+          : rows;
+
+        const bracketSorted = [...bracketSource]
+          .filter((row) => row.participant_a_id || row.participant_b_id || (row.score_a ?? 0) !== 0 || (row.score_b ?? 0) !== 0)
+          .sort((a, b) => {
+            const roundA = Number(a.round_no || 0);
+            const roundB = Number(b.round_no || 0);
+            if (roundA !== roundB) return roundA - roundB;
+            return Number(a.bout_no || 0) - Number(b.bout_no || 0);
+          });
+
+        setBracketTitle(
+          selectedCategoryId ? (categoryMap.get(selectedCategoryId) || 'Live Category Brackets') : 'Live Category Brackets'
+        );
+        setBracketRows(
+          bracketSorted.slice(0, 16).map((row) => {
+            const status = String(row.status || '').toLowerCase();
+            const winner: 'red' | 'blue' | 'live' | 'none' =
+              status.includes('running') || status.includes('progress')
+                ? 'live'
+                : row.winner_id && row.participant_a_id && row.winner_id === row.participant_a_id
+                ? 'red'
+                : row.winner_id && row.participant_b_id && row.winner_id === row.participant_b_id
+                ? 'blue'
+                : 'none';
+            return {
+              id: String(row.id),
+              round: row.round_no ? `Round ${row.round_no}` : `Bout ${row.bout_no || '-'}`,
+              red: formatFighter(row.participant_a_id),
+              blue: formatFighter(row.participant_b_id),
+              score: `${row.score_a ?? 0} - ${row.score_b ?? 0}${winner === 'live' ? ' (LIVE)' : ''}`,
+              winner,
+            };
+          })
+        );
+
+        const kataCategoryIds = new Set(
+          [...categoryMap.entries()]
+            .filter(([, name]) => name.toLowerCase().includes('kata'))
+            .map(([id]) => id)
+        );
+
+        const kataCandidates = rows
+          .filter((row) => kataCategoryIds.has(String(row.category_id || '')))
+          .sort((a, b) => {
+            const statusCompare = getStatusPriority(a.status) - getStatusPriority(b.status);
+            if (statusCompare !== 0) return statusCompare;
+            return Date.parse(String(b.created_at || 0)) - Date.parse(String(a.created_at || 0));
+          });
+
+        const kataRow = kataCandidates.find((row) => row.participant_a_id || row.participant_b_id) || kataCandidates[0];
+        if (kataRow) {
+          const kataFighterId = String(kataRow.participant_a_id || kataRow.participant_b_id || '');
+          const kataParticipant = participantMap.get(kataFighterId);
+          const kataClub = kataParticipant?.club_id ? clubMap.get(String(kataParticipant.club_id)) : '';
+          const categoryName = categoryMap.get(String(kataRow.category_id || '')) || 'WKF KATA SCOREBOARD';
+
+          setKataTitle(categoryName);
+          setKataAthlete(formatFighter(kataFighterId, 'Awaiting Kata Athlete'));
+          setKataAthleteMeta(kataClub || 'No judge feed exposed by source yet');
+
+          const history = Array.isArray(kataRow.points_aka_history)
+            ? kataRow.points_aka_history.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+            : [];
+
+          if (history.length >= 5) {
+            const judgeScores = Array.from({ length: 7 }, (_, idx) => history[idx] ?? null);
+            setKataJudges(judgeScores.map((score, idx) => ({ name: `J${idx + 1}`, score })));
+            const numericScores = judgeScores.filter((v): v is number => typeof v === 'number');
+            const total = numericScores.length >= 5
+              ? numericScores.reduce((sum, val) => sum + val, 0) - Math.min(...numericScores) - Math.max(...numericScores)
+              : null;
+            setKataTotalScore(total);
+          } else {
+            setKataJudges(Array.from({ length: 7 }, (_, idx) => ({ name: `J${idx + 1}`, score: null })));
+            setKataTotalScore(null);
+          }
+        }
+
+        const clubStats = new Map<string, { team: string; wins: number; played: number; scored: number }>();
+        for (const row of rows) {
+          const participantA = participantMap.get(String(row.participant_a_id || ''));
+          const participantB = participantMap.get(String(row.participant_b_id || ''));
+
+          const clubAId = participantA?.club_id ? String(participantA.club_id) : '';
+          const clubBId = participantB?.club_id ? String(participantB.club_id) : '';
+
+          if (clubAId) {
+            const team = clubMap.get(clubAId) || 'Unknown Club';
+            const stats = clubStats.get(clubAId) || { team, wins: 0, played: 0, scored: 0 };
+            stats.played += 1;
+            stats.scored += Number(row.score_a || 0);
+            if (row.winner_id && row.participant_a_id && row.winner_id === row.participant_a_id) stats.wins += 1;
+            clubStats.set(clubAId, stats);
+          }
+
+          if (clubBId) {
+            const team = clubMap.get(clubBId) || 'Unknown Club';
+            const stats = clubStats.get(clubBId) || { team, wins: 0, played: 0, scored: 0 };
+            stats.played += 1;
+            stats.scored += Number(row.score_b || 0);
+            if (row.winner_id && row.participant_b_id && row.winner_id === row.participant_b_id) stats.wins += 1;
+            clubStats.set(clubBId, stats);
+          }
+        }
+
+        const standings = [...clubStats.values()]
+          .map((s) => ({
+            ...s,
+            total: s.wins * 3 + s.scored,
+          }))
+          .sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            return b.scored - a.scored;
+          })
+          .slice(0, 12)
+          .map((row, idx) => ({
+            rank: idx + 1,
+            team: row.team,
+            wins: row.wins,
+            played: row.played,
+            scored: row.scored,
+            total: row.total,
+          }));
+
+        setStandingsRows(standings);
+      } catch (err) {
+        console.error('[DISPLAY] Error loading derived slide data:', err);
+      }
+    };
+
+    void loadDerivedSlidesData();
+    const refresh = setInterval(() => {
+      void loadDerivedSlidesData();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(refresh);
+    };
+  }, [activeDisplayPlaylist?.tatami, currentSlide?.category_filter, currentSlide?.tatami_filter, liveMatch.categoryId]);
+
   // DISPLAY PLAYLIST ROTATION TIMER
   useEffect(() => {
     if (!activeDisplayPlaylist || activeDisplayPlaylist.slides.length === 0 || !isPlaying) {
       return;
     }
 
-    const currentSlide = activeDisplayPlaylist.slides[slideIndex];
-    if (!currentSlide) {
+    const current = activeDisplayPlaylist.slides[slideIndex];
+    if (!current) {
       setSlideIndex(0);
       return;
     }
 
-    const totalSecs = currentSlide.duration_seconds || 15;
+    const totalSecs = current.duration_seconds || 15;
     setSlideTimeRemaining(totalSecs);
 
     const interval = setInterval(() => {
@@ -303,7 +694,6 @@ export default function PublicDisplayPage() {
     setSlideIndex((prev) => (prev - 1 + activeDisplayPlaylist.slides.length) % activeDisplayPlaylist.slides.length);
   };
 
-  // Toggle controls visibility on mouse move
   const handleMouseMove = () => {
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -312,20 +702,24 @@ export default function PublicDisplayPage() {
     }, 4500);
   };
 
-  // Fullscreen toggle
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => console.log(err));
+      document.documentElement.requestFullscreen().catch((err) => console.error(err));
       setIsFullscreen(true);
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen().catch((err) => console.log(err));
+        document.exitFullscreen().catch((err) => console.error(err));
         setIsFullscreen(false);
       }
     }
   };
 
-  const currentSlide: DisplayPlaylistSlide | undefined = activeDisplayPlaylist?.slides[slideIndex];
+  const handleRunHealthTest = async (type: 'TEST_LIVE_UPDATE' | 'SCORE_UPDATE') => {
+    setTestLogMessage(`Sending ${type}...`);
+    const res = await sendBridgeTestMessage(type);
+    setTestLogMessage(res.message);
+    setBridgeDiagnostic(getBridgeDiagnosticInfo());
+  };
 
   return (
     <div
@@ -360,15 +754,21 @@ export default function PublicDisplayPage() {
             <div className="max-w-7xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col justify-between py-4">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-xl bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> LIVE KUMITE
-                  </span>
+                  {hasLiveMatch ? (
+                    <span className="px-3 py-1 rounded-xl bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> LIVE KUMITE
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider">
+                      Waiting for Live Feed
+                    </span>
+                  )}
                   <span className="text-sm font-black text-cyan-400 uppercase tracking-widest">
-                    {currentSlide.tatami_filter || DEMO_KUMITE.tatami} — {currentSlide.category_filter || DEMO_KUMITE.category}
+                    {liveMatch.tatami || currentSlide.tatami_filter || 'Tatami 1'} — {liveMatch.category || currentSlide.category_filter || 'Kumite'}
                   </span>
                 </div>
                 <div className="px-4 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 font-mono text-cyan-300 font-bold text-sm">
-                  MATCH TIME: <span className="text-white text-base">{DEMO_KUMITE.matchTime}</span>
+                  MATCH TIME: <span className="text-white text-base">{liveMatch.matchTime || '03:00'}</span>
                 </div>
               </div>
 
@@ -380,7 +780,7 @@ export default function PublicDisplayPage() {
                     <span className="px-4 py-1 rounded-lg bg-red-600 font-black text-xs text-white uppercase tracking-wider">
                       AKA (RED)
                     </span>
-                    {DEMO_KUMITE.aka.senshu && (
+                    {liveMatch.aka.senshu && (
                       <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
                         ★ SENSHU FIRST SCORE
                       </span>
@@ -389,9 +789,11 @@ export default function PublicDisplayPage() {
 
                   <div>
                     <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
-                      {DEMO_KUMITE.aka.name}
+                      {liveMatch.aka.name}
                     </h2>
-                    <p className="text-sm font-extrabold text-red-300 mt-1">{DEMO_KUMITE.aka.club} ({DEMO_KUMITE.aka.country})</p>
+                    <p className="text-sm font-extrabold text-red-300 mt-1">
+                      {liveMatch.aka.club || ''} {liveMatch.aka.country ? `(${liveMatch.aka.country})` : ''}
+                    </p>
                   </div>
 
                   <div className="flex items-end justify-between mt-8">
@@ -400,7 +802,7 @@ export default function PublicDisplayPage() {
                         <span
                           key={f}
                           className={`px-2.5 py-1 rounded-md text-xs font-black border ${
-                            DEMO_KUMITE.aka.fouls.includes(f)
+                            liveMatch.aka.fouls?.includes(f)
                               ? 'bg-red-600 border-red-400 text-white shadow'
                               : 'bg-slate-900/60 border-slate-800 text-slate-600'
                           }`}
@@ -410,7 +812,7 @@ export default function PublicDisplayPage() {
                       ))}
                     </div>
                     <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
-                      {DEMO_KUMITE.aka.score}
+                      {liveMatch.aka.score}
                     </div>
                   </div>
                 </div>
@@ -418,7 +820,7 @@ export default function PublicDisplayPage() {
                 {/* VS CENTER BADGE */}
                 <div className="lg:col-span-2 flex flex-col items-center justify-center text-center py-4">
                   <span className="text-4xl font-black text-slate-600 tracking-tighter">VS</span>
-                  <span className="text-xs font-bold text-cyan-400 mt-2 tracking-widest uppercase">{DEMO_KUMITE.round}</span>
+                  <span className="text-xs font-bold text-cyan-400 mt-2 tracking-widest uppercase">{liveMatch.round || 'FINALS'}</span>
                 </div>
 
                 {/* AO (BLUE ATHLETE) */}
@@ -427,7 +829,7 @@ export default function PublicDisplayPage() {
                     <span className="px-4 py-1 rounded-lg bg-blue-600 font-black text-xs text-white uppercase tracking-wider">
                       AO (BLUE)
                     </span>
-                    {DEMO_KUMITE.ao.senshu && (
+                    {liveMatch.ao.senshu && (
                       <span className="px-3 py-1 rounded-full bg-yellow-500 text-black font-black text-xs tracking-wider shadow">
                         ★ SENSHU
                       </span>
@@ -436,9 +838,11 @@ export default function PublicDisplayPage() {
 
                   <div>
                     <h2 className="text-4xl font-black text-white tracking-wide uppercase drop-shadow-md">
-                      {DEMO_KUMITE.ao.name}
+                      {liveMatch.ao.name}
                     </h2>
-                    <p className="text-sm font-extrabold text-blue-300 mt-1">{DEMO_KUMITE.ao.club} ({DEMO_KUMITE.ao.country})</p>
+                    <p className="text-sm font-extrabold text-blue-300 mt-1">
+                      {liveMatch.ao.club || ''} {liveMatch.ao.country ? `(${liveMatch.ao.country})` : ''}
+                    </p>
                   </div>
 
                   <div className="flex items-end justify-between mt-8">
@@ -447,7 +851,7 @@ export default function PublicDisplayPage() {
                         <span
                           key={f}
                           className={`px-2.5 py-1 rounded-md text-xs font-black border ${
-                            DEMO_KUMITE.ao.fouls.includes(f)
+                            liveMatch.ao.fouls?.includes(f)
                               ? 'bg-blue-600 border-blue-400 text-white shadow'
                               : 'bg-slate-900/60 border-slate-800 text-slate-600'
                           }`}
@@ -457,7 +861,7 @@ export default function PublicDisplayPage() {
                       ))}
                     </div>
                     <div className="text-8xl font-black text-white font-mono tracking-tighter drop-shadow-lg">
-                      {DEMO_KUMITE.ao.score}
+                      {liveMatch.ao.score}
                     </div>
                   </div>
                 </div>
@@ -469,26 +873,28 @@ export default function PublicDisplayPage() {
               <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
                 <div>
                   <span className="px-3 py-1 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-400 text-xs font-black uppercase tracking-wider">
-                    WKF KATA SCOREBOARD (7 JUDGES)
+                    WKF KATA SCOREBOARD (LIVE)
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">Male Senior Kata Final Round</h2>
+                  <h2 className="text-2xl font-black text-white mt-1">{kataTitle}</h2>
+                  <p className="text-sm text-purple-200 mt-1 font-bold">{kataAthlete}</p>
+                  <p className="text-xs text-purple-400 mt-0.5 font-semibold uppercase tracking-wide">{kataAthleteMeta}</p>
                 </div>
                 <div className="text-right">
                   <span className="text-xs text-slate-400 uppercase font-bold">Total Trimmed Score</span>
-                  <div className="text-4xl font-black text-purple-400 font-mono">25.0</div>
+                  <div className="text-4xl font-black text-purple-400 font-mono">{kataTotalScore === null ? '--' : kataTotalScore.toFixed(1)}</div>
                 </div>
               </div>
 
               {/* 7 JUDGES GRID */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 my-auto">
-                {DEMO_KATA_JUDGES.map((j, idx) => (
+                {kataJudges.map((j, idx) => (
                   <div
                     key={idx}
                     className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center flex flex-col items-center justify-center gap-2 shadow-lg"
                   >
                     <span className="text-xs font-bold text-slate-400">{j.name}</span>
-                    <span className="text-3xl font-black text-white font-mono">{j.score.toFixed(1)}</span>
-                    <span className="text-[10px] text-purple-400 font-semibold uppercase">Counted</span>
+                    <span className="text-3xl font-black text-white font-mono">{j.score === null ? '--' : j.score.toFixed(1)}</span>
+                    <span className="text-[10px] text-purple-400 font-semibold uppercase">{j.score === null ? 'Awaiting Feed' : 'Counted'}</span>
                   </div>
                 ))}
               </div>
@@ -501,13 +907,18 @@ export default function PublicDisplayPage() {
                   <span className="px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-xs font-black uppercase tracking-wider">
                     TOURNAMENT BRACKETS & DRAWS
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">Male Senior Kumite -75kg Bracket</h2>
+                  <h2 className="text-2xl font-black text-white mt-1">{bracketTitle}</h2>
                 </div>
                 <span className="text-xs text-slate-400 font-bold uppercase">LIVE BRACKET PROGRESSION</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-auto pb-8">
-                {DEMO_BRACKETS.map((b) => (
+                {bracketRows.length === 0 && (
+                  <div className="col-span-full p-6 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-400 font-semibold">
+                    No bracket rows available from live feed yet.
+                  </div>
+                )}
+                {bracketRows.map((b) => (
                   <div key={b.id} className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-4">
                     <div className="text-xs font-black text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
                       {b.round}
@@ -535,9 +946,9 @@ export default function PublicDisplayPage() {
               <div className="border-b border-slate-800 pb-4 flex items-center justify-between mb-6">
                 <div>
                   <span className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
-                    CHAMPIONSHIP MEDAL STANDINGS
+                    LIVE LEADERBOARD (DERIVED)
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">Overall Country & Club Tally</h2>
+                  <h2 className="text-2xl font-black text-white mt-1">Club Performance from Bout Results</h2>
                 </div>
                 <Trophy className="w-8 h-8 text-amber-400" />
               </div>
@@ -546,22 +957,27 @@ export default function PublicDisplayPage() {
                 <div className="grid grid-cols-12 px-6 py-2 text-xs font-black text-slate-400 uppercase tracking-wider">
                   <span className="col-span-1">Rank</span>
                   <span className="col-span-6">Team / Country</span>
-                  <span className="col-span-1 text-center text-amber-400">Gold</span>
-                  <span className="col-span-1 text-center text-slate-300">Silver</span>
-                  <span className="col-span-1 text-center text-amber-600">Bronze</span>
-                  <span className="col-span-2 text-right text-cyan-400">Total</span>
+                  <span className="col-span-1 text-center text-amber-400">Wins</span>
+                  <span className="col-span-1 text-center text-slate-300">Played</span>
+                  <span className="col-span-1 text-center text-amber-600">Scored</span>
+                  <span className="col-span-2 text-right text-cyan-400">Pts</span>
                 </div>
 
-                {DEMO_MEDALS.map((m) => (
+                {standingsRows.length === 0 && (
+                  <div className="px-6 py-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-400 font-semibold">
+                    No standings could be derived from bout outcomes yet.
+                  </div>
+                )}
+                {standingsRows.map((m) => (
                   <div
                     key={m.rank}
                     className="grid grid-cols-12 px-6 py-4 rounded-2xl bg-slate-900/80 border border-slate-800 items-center font-bold text-sm"
                   >
                     <span className="col-span-1 text-lg font-black text-white">#{m.rank}</span>
                     <span className="col-span-6 text-white text-base font-extrabold">{m.team}</span>
-                    <span className="col-span-1 text-center font-mono font-black text-amber-400 text-base">{m.gold}</span>
-                    <span className="col-span-1 text-center font-mono font-black text-slate-300 text-base">{m.silver}</span>
-                    <span className="col-span-1 text-center font-mono font-black text-amber-600 text-base">{m.bronze}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-amber-400 text-base">{m.wins}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-slate-300 text-base">{m.played}</span>
+                    <span className="col-span-1 text-center font-mono font-black text-amber-600 text-base">{m.scored}</span>
                     <span className="col-span-2 text-right font-mono font-black text-cyan-400 text-lg">{m.total}</span>
                   </div>
                 ))}
@@ -575,15 +991,20 @@ export default function PublicDisplayPage() {
                   <span className="px-3 py-1 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-400 text-xs font-black uppercase tracking-wider">
                     LIVE BOUT SCHEDULE & RING QUEUE
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">Upcoming Matches ({currentSlide.tatami_filter || 'All Tatamis'})</h2>
+                  <h2 className="text-2xl font-black text-white mt-1">Upcoming Matches ({currentSlide.tatami_filter || activeDisplayPlaylist?.tatami || 'All Tatamis'})</h2>
                 </div>
                 <Calendar className="w-8 h-8 text-blue-400" />
               </div>
 
               <div className="w-full flex flex-col gap-3 my-auto pb-8">
-                {DEMO_SCHEDULE.map((s) => (
+                {scheduleRows.length === 0 && (
+                  <div className="px-6 py-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-400 font-semibold">
+                    No schedule rows available from live feed yet.
+                  </div>
+                )}
+                {scheduleRows.map((s) => (
                   <div
-                    key={s.bout}
+                    key={s.id}
                     className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-sm font-bold"
                   >
                     <div className="flex items-center gap-4">
@@ -666,7 +1087,7 @@ export default function PublicDisplayPage() {
       <div className="absolute top-0 left-0 right-0 z-20 p-6 bg-gradient-to-b from-black/90 via-black/50 to-transparent pointer-events-none">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           {/* Tournament Logo & Name */}
-          <div className="flex items-center gap-4 bg-slate-900/80 backdrop-blur-xl px-5 py-3 rounded-2xl border border-cyan-500/30 shadow-[0_0_30px_rgba(0,240,255,0.15)]">
+          <div className="flex items-center gap-4 bg-slate-900/80 backdrop-blur-xl px-5 py-3 rounded-2xl border border-cyan-500/30 shadow-[0_0_30px_rgba(0,240,255,0.15)] pointer-events-auto">
             {tournament?.logo ? (
               <img
                 src={tournament.logo}
@@ -691,16 +1112,33 @@ export default function PublicDisplayPage() {
                 )}
                 {activeDisplayPlaylist && (
                   <span className="flex items-center gap-1 border-l border-slate-700 pl-3 text-emerald-400">
-                    <Layers className="w-3 h-3" /> {activeDisplayPlaylist.name}
+                    {activeDisplayPlaylist.name}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* SP SportData Branding Badge */}
-          <div className="bg-slate-900/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-slate-800 shadow-lg">
-            <SpLogo size="sm" />
+          {/* REALTIME BRIDGE CONNECTION STATUS BADGE */}
+          <div className="flex items-center gap-3 pointer-events-auto">
+            <button
+              onClick={() => setShowDiagnosticPanel(!showDiagnosticPanel)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-2 shadow-lg transition ${
+                bridgeStatus === 'CONNECTED'
+                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40 hover:bg-emerald-900'
+                  : bridgeStatus === 'CONNECTING'
+                  ? 'bg-amber-950/80 text-amber-400 border-amber-500/40 animate-pulse'
+                  : 'bg-red-950/80 text-red-400 border-red-500/40 hover:bg-red-900'
+              }`}
+              title="Click to toggle Live Bridge Diagnostic Panel"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>BRIDGE: {bridgeStatus}</span>
+            </button>
+
+            <div className="bg-slate-900/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-slate-800 shadow-lg">
+              <SpLogo size="sm" />
+            </div>
           </div>
         </div>
       </div>
@@ -761,24 +1199,19 @@ export default function PublicDisplayPage() {
 
             <div className="h-6 w-px bg-slate-700 mx-1 hidden sm:block" />
 
-            {/* SCROLL BUTTON CONTROLLER FOR ACTIVE DISPLAY TARGET */}
-            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 gap-1" title="Scroll Up / Down active display target view">
-              <button
-                onClick={handleScrollUp}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 transition"
-                title="Scroll Up Display View"
-              >
-                <ChevronUp className="w-4 h-4 text-cyan-400" />
-              </button>
-              <span className="text-[10px] font-mono font-bold text-cyan-300 uppercase px-1">Scroll</span>
-              <button
-                onClick={handleScrollDown}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 transition"
-                title="Scroll Down Display View"
-              >
-                <ChevronDown className="w-4 h-4 text-cyan-400" />
-              </button>
-            </div>
+            {/* DIAGNOSTIC PANEL TOGGLE BUTTON */}
+            <button
+              onClick={() => setShowDiagnosticPanel(!showDiagnosticPanel)}
+              className={`px-3 py-2 rounded-xl text-xs font-mono font-bold border flex items-center gap-1.5 transition ${
+                showDiagnosticPanel
+                  ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                  : 'bg-slate-800 text-cyan-300 border-cyan-500/40 hover:bg-slate-700'
+              }`}
+              title="Toggle Diagnostic Panel Overlay"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Live Diagnostic Panel</span>
+            </button>
 
             {/* AUTO-SCROLL TOGGLE BUTTON */}
             <button
@@ -823,17 +1256,6 @@ export default function PublicDisplayPage() {
               {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
 
-            {/* Slide Info */}
-            <div className="px-3 text-xs font-mono text-cyan-300 truncate max-w-[180px] hidden md:block">
-              {activeDisplayPlaylist && currentSlide ? (
-                <span>
-                  #{slideIndex + 1}/{activeDisplayPlaylist.slides.length}: {currentSlide.title}
-                </span>
-              ) : (
-                <span>No Active Playlist</span>
-              )}
-            </div>
-
             {/* Close window */}
             <button
               onClick={() => window.close()}
@@ -842,6 +1264,115 @@ export default function PublicDisplayPage() {
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* NON-INTRUSIVE DIAGNOSTIC PANEL OVERLAY */}
+      {/* ========================================================================= */}
+      {showDiagnosticPanel && (
+        <div className="fixed top-24 right-6 z-50 w-96 bg-slate-950/95 backdrop-blur-2xl border-2 border-cyan-500/50 rounded-3xl p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] text-xs font-mono text-slate-300">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+            <div className="flex items-center gap-2 text-cyan-400 font-extrabold uppercase tracking-wider text-sm">
+              <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span>LIVE CONNECTION</span>
+            </div>
+            <button
+              onClick={() => setShowDiagnosticPanel(false)}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Bridge:</span>
+              <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                bridgeStatus === 'CONNECTED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-red-950 text-red-400 border border-red-500/30'
+              }`}>
+                {bridgeStatus === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">WebSocket / Realtime:</span>
+              <span className="font-bold text-cyan-300">{bridgeDiagnostic.status}</span>
+            </div>
+
+            <div className="py-1 border-b border-slate-900 truncate">
+              <span className="text-slate-400 block mb-0.5">WebSocket URL:</span>
+              <span className="text-[10px] text-slate-400 font-mono select-all block bg-slate-900 p-1 rounded overflow-hidden text-ellipsis">
+                {bridgeDiagnostic.wsUrl}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Last Event:</span>
+              <span className="font-bold text-amber-300">{liveMatch.lastEvent || bridgeDiagnostic.lastReceivedEvent || 'NONE'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Last Message:</span>
+              <span className="font-bold text-emerald-300">{liveMatch.lastMessageTime || bridgeDiagnostic.lastReceivedTime || '--:--:--'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Tournament:</span>
+              <span className="font-bold text-slate-200 truncate max-w-[180px]">{liveMatch.tournamentId || tournament?.id || 'GLOBAL'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Tatami:</span>
+              <span className="font-bold text-cyan-300">{liveMatch.tatami || 'Tatami 1'}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Match:</span>
+              <span className="font-bold text-slate-200">{liveMatch.matchId || 'BOUT #1'}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 text-center font-bold">
+              <div className="p-2 rounded-xl bg-red-950/60 border border-red-500/40 text-red-300">
+                <span className="block text-[10px] text-red-400 uppercase">AKA Score</span>
+                <span className="text-xl font-mono text-white">{liveMatch.aka.score}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-blue-950/60 border border-blue-500/40 text-blue-300">
+                <span className="block text-[10px] text-blue-400 uppercase">AO Score</span>
+                <span className="text-xl font-mono text-white">{liveMatch.ao.score}</span>
+              </div>
+            </div>
+
+            {/* HEALTH TEST TRIGGER CONTROLS */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
+                Bridge Health Diagnostics:
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleRunHealthTest('TEST_LIVE_UPDATE')}
+                  className="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 font-mono text-[10px] flex items-center justify-center gap-1 transition"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Send TEST_LIVE</span>
+                </button>
+
+                <button
+                  onClick={() => handleRunHealthTest('SCORE_UPDATE')}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] flex items-center justify-center gap-1 transition"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Send SCORE_UPD</span>
+                </button>
+              </div>
+
+              {testLogMessage && (
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-mono">
+                  {testLogMessage}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
