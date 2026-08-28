@@ -1089,8 +1089,19 @@ export default function PublicDisplayPage() {
                 className="w-full h-full max-h-[80vh] object-contain rounded-2xl"
               />
             </div>
+          ) : currentSlide.type === 'web_url' ? (
+            /* 9. WEB URL / IFRAME SLIDE */
+            <div className="min-h-[calc(100vh-14rem)] w-full flex items-center justify-center bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+              <iframe
+                src={currentSlide.web_url || 'https://karatetechhybrid.spsportdatasolution.org/dashboard/operator/'}
+                className="w-full h-[80vh] border-0 bg-white"
+                title={currentSlide.title || "Live Web Feed"}
+                allow="autoplay; fullscreen; encrypted-media"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              />
+            </div>
           ) : (
-            /* 8. IMAGE SLIDE */
+            /* 10. IMAGE SLIDE */
             <div className="min-h-[calc(100vh-14rem)] flex items-center justify-center bg-slate-950">
               <img
                 src={currentSlide.sponsor_image_url || 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=1200&auto=format&fit=crop&q=80'}

@@ -7,7 +7,8 @@ export type DisplaySlideType =
   | 'announcement_sponsor'
   | 'video'
   | 'image'
-  | 'officials_page';
+  | 'officials_page'
+  | 'web_url';
 
 
 export interface DisplayPlaylistSlide {
@@ -20,6 +21,7 @@ export interface DisplayPlaylistSlide {
   announcement_text?: string;
   sponsor_image_url?: string;
   video_url?: string;
+  web_url?: string;
   order: number;
 }
 

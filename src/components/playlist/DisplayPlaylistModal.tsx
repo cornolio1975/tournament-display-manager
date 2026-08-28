@@ -26,6 +26,7 @@ import {
   Info,
   ChevronRight,
   RotateCcw,
+  Globe,
 } from 'lucide-react';
 import { db } from '@/db/dbClient';
 import { DisplayPlaylist, DisplayPlaylistSlide, DisplaySlideType } from '@/db/types';
@@ -103,6 +104,13 @@ const SLIDE_TYPE_OPTIONS: { type: DisplaySlideType; label: string; icon: React.E
     icon: FileText,
     defaultDuration: 15,
     desc: 'Display tournament officials and referees.',
+  },
+  {
+    type: 'web_url',
+    label: 'Live Feed / Web Page',
+    icon: Globe,
+    defaultDuration: 30,
+    desc: 'Display a live web feed or external website URL via iframe.',
   },
 ];
 
@@ -284,6 +292,7 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
       announcement_text: type === 'announcement_sponsor' ? 'Official Karate Championship Live Broadcast' : undefined,
       sponsor_image_url: defaultImageUrl,
       video_url: defaultVideoUrl,
+      web_url: type === 'web_url' ? 'https://karatetechhybrid.spsportdatasolution.org/dashboard/operator/' : undefined,
     };
     setFormSlides([...formSlides, newSlide]);
   };
@@ -771,6 +780,24 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
                                     value={slide.sponsor_image_url || ''}
                                     onChange={(url) => handleSlideChange(idx, 'sponsor_image_url', url)}
                                   />
+                                </div>
+                              )}
+
+                              {/* WEB URL SLIDE MEDIA INPUTS */}
+                              {slide.type === 'web_url' && (
+                                <div className="sm:col-span-3 space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                      Website URL
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={slide.web_url || ''}
+                                      onChange={(e) => handleSlideChange(idx, 'web_url', e.target.value)}
+                                      placeholder="https://example.com"
+                                      className="w-full px-2.5 py-1.5 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                  </div>
                                 </div>
                               )}
 
