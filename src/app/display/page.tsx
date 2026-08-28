@@ -126,7 +126,7 @@ function mergeLiveMatchForSameMatch(previous: LiveMatchData, incoming: LiveMatch
       name: isPlaceholderAthleteName(incoming.aka.name) ? previous.aka.name : incoming.aka.name,
       club: incoming.aka.club || previous.aka.club,
       country: incoming.aka.country || previous.aka.country,
-      fouls: incoming.aka.fouls?.length ? incoming.aka.fouls : previous.aka.fouls,
+      fouls: incoming.aka.fouls ?? previous.aka.fouls,
     },
     ao: {
       ...previous.ao,
@@ -134,7 +134,7 @@ function mergeLiveMatchForSameMatch(previous: LiveMatchData, incoming: LiveMatch
       name: isPlaceholderAthleteName(incoming.ao.name) ? previous.ao.name : incoming.ao.name,
       club: incoming.ao.club || previous.ao.club,
       country: incoming.ao.country || previous.ao.country,
-      fouls: incoming.ao.fouls?.length ? incoming.ao.fouls : previous.ao.fouls,
+      fouls: incoming.ao.fouls ?? previous.ao.fouls,
     },
   };
 }
@@ -869,32 +869,32 @@ export default function PublicDisplayPage() {
             </div>
           ) : currentSlide.type === 'kata_scoreboard' ? (
             /* 2. WKF KATA 7-JUDGE SCOREBOARD */
-            <div className="max-w-7xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col justify-between py-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+            <div className="max-w-[96rem] mx-auto min-h-[calc(100vh-12rem)] flex flex-col justify-between py-6 px-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-6 mb-8 gap-6">
                 <div>
                   <span className="px-3 py-1 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-400 text-xs font-black uppercase tracking-wider">
                     WKF KATA SCOREBOARD (LIVE)
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">{kataTitle}</h2>
-                  <p className="text-sm text-purple-200 mt-1 font-bold">{kataAthlete}</p>
-                  <p className="text-xs text-purple-400 mt-0.5 font-semibold uppercase tracking-wide">{kataAthleteMeta}</p>
+                  <h2 className="text-4xl xl:text-5xl font-black text-white mt-2 leading-tight">{kataTitle}</h2>
+                  <p className="text-xl xl:text-2xl text-purple-200 mt-2 font-bold">{kataAthlete}</p>
+                  <p className="text-sm xl:text-base text-purple-400 mt-1 font-semibold uppercase tracking-wide">{kataAthleteMeta}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Total Trimmed Score</span>
-                  <div className="text-4xl font-black text-purple-400 font-mono">{kataTotalScore === null ? '--' : kataTotalScore.toFixed(1)}</div>
+                  <span className="text-sm text-slate-400 uppercase font-bold tracking-wider">Total Trimmed Score</span>
+                  <div className="text-6xl xl:text-7xl font-black text-purple-400 font-mono leading-none mt-2">{kataTotalScore === null ? '--' : kataTotalScore.toFixed(1)}</div>
                 </div>
               </div>
 
               {/* 7 JUDGES GRID */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 my-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-5 xl:gap-6 my-auto">
                 {kataJudges.map((j, idx) => (
                   <div
                     key={idx}
-                    className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center flex flex-col items-center justify-center gap-2 shadow-lg"
+                    className="min-h-[14rem] xl:min-h-[16rem] p-6 xl:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 text-center flex flex-col items-center justify-center gap-4 shadow-lg"
                   >
-                    <span className="text-xs font-bold text-slate-400">{j.name}</span>
-                    <span className="text-3xl font-black text-white font-mono">{j.score === null ? '--' : j.score.toFixed(1)}</span>
-                    <span className="text-[10px] text-purple-400 font-semibold uppercase">{j.score === null ? 'Awaiting Feed' : 'Counted'}</span>
+                    <span className="text-sm xl:text-base font-bold text-slate-400 tracking-wide">{j.name}</span>
+                    <span className="text-5xl xl:text-6xl font-black text-white font-mono leading-none">{j.score === null ? '--' : j.score.toFixed(1)}</span>
+                    <span className="text-xs xl:text-sm text-purple-400 font-semibold uppercase tracking-wider">{j.score === null ? 'Awaiting Feed' : 'Counted'}</span>
                   </div>
                 ))}
               </div>

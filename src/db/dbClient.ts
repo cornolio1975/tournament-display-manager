@@ -102,6 +102,7 @@ export const db = {
 
     async add(playlistData: Omit<DisplayPlaylist, 'id' | 'created_at' | 'updated_at'>): Promise<DisplayPlaylist | null> {
       const now = new Date().toISOString();
+      const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       
       if (playlistData.is_active) {
         // Deactivate all others first
@@ -109,6 +110,7 @@ export const db = {
       }
 
       const { data, error } = await supabase.from('display_playlists').insert([{
+        id,
         ...playlistData,
         created_at: now,
         updated_at: now,

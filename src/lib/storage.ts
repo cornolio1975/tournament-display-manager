@@ -78,40 +78,115 @@ export async function saveSponsors(sponsors: Sponsor[]): Promise<void> {
   if (error) console.error('Failed to save sponsors:', error);
 }
 
+// --- DM settings helpers ---
+// DM-specific fields are stored inside the `settings.dm` JSONB sub-object
+// so they don't conflict with KarateTech's own tournament columns.
+
+interface DmSettings {
+  active?: boolean;
+  isDeleted?: boolean;
+  logo?: string;
+  contactPerson?: string;
+  phoneNumber?: string;
+  email?: string;
+  website?: string;
+  facebookInstagram?: string;
+  address?: string;
+  description?: string;
+  karateTechId?: string;
+  karateTechSyncedAt?: string;
+}
+
+/** Extract DM overlay fields from a raw Supabase tournament row */
+function rowToTournament(row: Record<string, unknown>): Tournament {
+  const dm = ((row.settings as Record<string, unknown>)?.dm ?? {}) as DmSettings;
+  return {
+    id: row.id as string,
+    name: (row.name as string) ?? '',
+    organizer: (row.organizer as string) ?? '',
+    date: (row.date as string) ?? '',
+    venue: (row.venue as string) ?? '',
+    address: dm.address ?? (row.city as string) ?? '',
+    description: dm.description ?? (row.discipline as string) ?? '',
+    logo: dm.logo ?? '',
+    contactPerson: dm.contactPerson ?? '',
+    phoneNumber: dm.phoneNumber ?? '',
+    email: dm.email ?? '',
+    website: dm.website ?? (row.pdf_url as string) ?? '',
+    facebookInstagram: dm.facebookInstagram ?? '',
+    active: dm.active ?? false,
+    isDeleted: dm.isDeleted ?? !!(row.deleted_at),
+    karateTechId: dm.karateTechId ?? (row.id as string),
+    karateTechSyncedAt: dm.karateTechSyncedAt,
+  };
+}
+
+/** Build the Supabase upsert payload — only valid KT columns + settings.dm for DM fields */
+async function tournamentToRow(t: Tournament): Promise<Record<string, unknown>> {
+  const uploadedLogo = await uploadMediaIfDataUrl(t.logo, 'tournament');
+
+  // Merge DM fields into settings.dm, preserving any existing KT settings
+  const dmPayload: DmSettings = {
+    active: t.active,
+    isDeleted: t.isDeleted ?? false,
+    logo: uploadedLogo,
+    contactPerson: t.contactPerson,
+    phoneNumber: t.phoneNumber,
+    email: t.email,
+    website: t.website,
+    facebookInstagram: t.facebookInstagram,
+    address: t.address,
+    description: t.description,
+    karateTechId: t.karateTechId,
+    karateTechSyncedAt: t.karateTechSyncedAt,
+  };
+
+  const nowIso = new Date().toISOString();
+  const dateStr = t.date || new Date().toLocaleDateString();
+
+  return {
+    // KT table columns with required NOT NULL constraints
+    id: t.karateTechId ?? t.id,
+    name: t.name || 'Tournament',
+    organizer: t.organizer || null,
+    date: dateStr,
+    date_iso: nowIso,
+    registration_close: dateStr,
+    registration_close_iso: nowIso,
+    status: t.active ? 'Active' : 'Upcoming',
+    venue: t.venue || null,
+    city: t.address || null,
+    discipline: t.description || null,
+    // Merge DM payload into settings.dm
+    settings: { dm: dmPayload },
+  };
+}
+
 // --- TOURNAMENT STORAGE ---
 export async function getTournaments(): Promise<Tournament[]> {
-  const { data, error } = await supabase.from('tournaments').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('tournaments')
+    .select('id,name,organizer,date,venue,city,discipline,pdf_url,deleted_at,created_at,settings')
+    .order('created_at', { ascending: false });
   if (error) {
-    console.error('Failed to load tournaments:', error);
+    console.warn('Failed to load tournaments:', error.message || error);
     return [];
   }
-  return data || [];
+  return (data ?? []).map((row) => rowToTournament(row as Record<string, unknown>));
 }
 
 export async function saveTournaments(tournaments: Tournament[]): Promise<void> {
-  const processed = await Promise.all(
-    tournaments.map(async (t) => ({
-      ...t,
-      logo: await uploadMediaIfDataUrl(t.logo, 'tournament'),
-    }))
-  );
-  const { error } = await supabase.from('tournaments').upsert(processed);
-  if (error) console.error('Failed to save tournaments:', error);
+  const rows = await Promise.all(tournaments.map(tournamentToRow));
+  const { error } = await supabase.from('tournaments').upsert(rows, { onConflict: 'id' });
+  if (error) {
+    console.warn('Failed to save tournaments:', error.message || error);
+  }
 }
 
 export async function getActiveTournament(): Promise<Tournament | null> {
-  const { data, error } = await supabase
-    .from('tournaments')
-    .select('*')
-    .eq('active', true)
-    .eq('is_deleted', false)
-    .limit(1)
-    .single();
-
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error loading active tournament:', error);
-  }
-  return data || null;
+  // `active` is stored in settings.dm — fetch all and filter in JS
+  const all = await getTournaments();
+  return all.find((t) => t.active && !t.isDeleted) ?? null;
 }
 
 // --- PLAYLIST STORAGE ---

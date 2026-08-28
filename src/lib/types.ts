@@ -94,7 +94,7 @@ export interface LiveMatchData {
     club?: string;
     score: number;
     senshu: boolean;
-    fouls: string[];
+    fouls?: string[];
   };
   ao: {
     name: string;
@@ -102,7 +102,7 @@ export interface LiveMatchData {
     club?: string;
     score: number;
     senshu: boolean;
-    fouls: string[];
+    fouls?: string[];
   };
   winner?: string;
   victoryMethod?: string;

@@ -362,21 +362,62 @@ function formatTimerSeconds(seconds?: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function isActivePenalty(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value > 0;
+  if (typeof value !== 'string') return false;
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'active' || normalized === 'on';
+}
+
 /**
  * Converts bout penalties flags into string list
  */
-function extractFouls(payload: Record<string, any>, side: 'a' | 'b'): string[] {
+function extractFouls(payload: Record<string, any>, side: 'a' | 'b'): string[] | undefined {
+  const hasFoulFields = 
+    `penalties_c1_${side}` in payload ||
+    `penalties_c2_${side}` in payload ||
+    `penalties_c3_${side}` in payload ||
+    `penalties_hc_${side}` in payload ||
+    `penalties_h_${side}` in payload ||
+    `penalties_${side}` in payload;
+    
+  if (!hasFoulFields) return undefined;
+
   const fouls: string[] = [];
-  if (payload[`penalties_c1_${side}`]) fouls.push('C1');
-  if (payload[`penalties_c2_${side}`]) fouls.push('C2');
-  if (payload[`penalties_c3_${side}`]) fouls.push('C3');
-  if (payload[`penalties_hc_${side}`]) fouls.push('HC');
-  if (payload[`penalties_h_${side}`]) fouls.push('H');
+  if (isActivePenalty(payload[`penalties_c1_${side}`])) fouls.push('C1');
+  if (isActivePenalty(payload[`penalties_c2_${side}`])) fouls.push('C2');
+  if (isActivePenalty(payload[`penalties_c3_${side}`])) fouls.push('C3');
+  if (isActivePenalty(payload[`penalties_hc_${side}`])) fouls.push('HC');
+  if (isActivePenalty(payload[`penalties_h_${side}`])) fouls.push('H');
   
-  if (fouls.length === 0 && Array.isArray(payload[`penalties_${side}`])) {
-    return payload[`penalties_${side}`];
+  if (fouls.length === 0) {
+    const p = payload[`penalties_${side}`];
+    if (Array.isArray(p)) return p;
+    if (typeof p === 'string') {
+      try {
+        const parsed = JSON.parse(p);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        return p.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
   }
   return fouls;
+}
+
+function parseFouls(raw: any): string[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch(e) {}
+    return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+  }
+  return undefined;
 }
 
 /**
@@ -407,7 +448,7 @@ export function normalizeLiveMatchData(payload: Record<string, any>): LiveMatchD
         country: payload.aka?.country || payload.aka_country || '',
         score: typeof payload.aka?.score === 'number' ? payload.aka.score : (payload.score_a ?? 0),
         senshu: !!(payload.aka?.senshu ?? payload.senshu_a),
-        fouls: payload.aka?.fouls || extractFouls(payload, 'a'),
+        fouls: parseFouls(payload.aka?.fouls) ?? extractFouls(payload, 'a'),
       },
       ao: {
         name: payload.ao?.name || payload.ao_name || 'AO ATHLETE',
@@ -415,7 +456,7 @@ export function normalizeLiveMatchData(payload: Record<string, any>): LiveMatchD
         country: payload.ao?.country || payload.ao_country || '',
         score: typeof payload.ao?.score === 'number' ? payload.ao.score : (payload.score_b ?? 0),
         senshu: !!(payload.ao?.senshu ?? payload.senshu_b),
-        fouls: payload.ao?.fouls || extractFouls(payload, 'b'),
+        fouls: parseFouls(payload.ao?.fouls) ?? extractFouls(payload, 'b'),
       },
       winner: payload.winner || payload.winner_id,
       victoryMethod: payload.victoryMethod || payload.victory_method,

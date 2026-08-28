@@ -23,6 +23,7 @@ import { PlaylistManager } from '@/components/playlist/PlaylistManager';
 import { DisplayPlaylistModal } from '@/components/playlist/DisplayPlaylistModal';
 import { ToastContainer } from '@/components/ui/Toast';
 import { OpenTournamentDisplayButton } from '@/components/karatetech/OpenTournamentDisplayButton';
+import { KarateTechSyncPanel } from '@/components/karatetech/KarateTechSyncPanel';
 import { SpLogo } from '@/components/ui/SpLogo';
 
 export default function AdminDashboardPage() {
@@ -256,6 +257,9 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* KARATETECH LIVE BRIDGE */}
+            <KarateTechSyncPanel onSynced={loadData} />
 
             {/* QUICK ACTIONS BANNER */}
             <div className="p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
