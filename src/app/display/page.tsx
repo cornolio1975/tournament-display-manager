@@ -1057,8 +1057,27 @@ export default function PublicDisplayPage() {
                 POWERED BY KARATETECH & SP SPORTDATA SOLUTION
               </p>
             </div>
+          ) : currentSlide.type === 'officials_page' ? (
+            /* 7. OFFICIALS PAGE SLIDE */
+            <div className="max-w-5xl mx-auto min-h-[calc(100vh-14rem)] flex flex-col items-center justify-center py-4 text-center">
+              <h1 className="text-5xl font-black text-white tracking-wide max-w-3xl leading-tight">
+                {currentSlide.title || 'Tournament Officials & Referees'}
+              </h1>
+              <p className="text-xl font-bold text-cyan-400 mt-6 tracking-widest uppercase">
+                {currentSlide.announcement_text || 'Official List'}
+              </p>
+              {currentSlide.sponsor_image_url && (
+                <div className="mt-10 p-4 rounded-3xl bg-slate-900/80 border border-slate-800 max-w-4xl overflow-hidden shadow-2xl">
+                  <img
+                    src={currentSlide.sponsor_image_url}
+                    alt={currentSlide.title}
+                    className="max-h-[60vh] w-full object-contain rounded-2xl"
+                  />
+                </div>
+              )}
+            </div>
           ) : currentSlide.type === 'video' ? (
-            /* 7. VIDEO MEDIA SLIDE */
+            /* 8. VIDEO MEDIA SLIDE */
             <div className="min-h-[calc(100vh-14rem)] flex items-center justify-center bg-black">
               <video
                 ref={videoRef}

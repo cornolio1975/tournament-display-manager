@@ -97,6 +97,13 @@ const SLIDE_TYPE_OPTIONS: { type: DisplaySlideType; label: string; icon: React.E
     defaultDuration: 10,
     desc: 'Full-bleed image banner or promotional poster.',
   },
+  {
+    type: 'officials_page',
+    label: 'Officials Page',
+    icon: FileText,
+    defaultDuration: 15,
+    desc: 'Display tournament officials and referees.',
+  },
 ];
 
 export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
@@ -735,8 +742,8 @@ export const DisplayPlaylistModal: React.FC<DisplayPlaylistModalProps> = ({
                                 </div>
                               )}
 
-                              {/* IMAGE SLIDE MEDIA INPUTS */}
-                              {slide.type === 'image' && (
+                              {/* IMAGE & OFFICIALS SLIDE MEDIA INPUTS */}
+                              {(slide.type === 'image' || slide.type === 'officials_page') && (
                                 <div className="sm:col-span-3 space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
                                   {dbMediaList.length > 0 && (
                                     <div>

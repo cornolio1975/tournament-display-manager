@@ -6,7 +6,9 @@ export type DisplaySlideType =
   | 'match_schedule'
   | 'announcement_sponsor'
   | 'video'
-  | 'image';
+  | 'image'
+  | 'officials_page';
+
 
 export interface DisplayPlaylistSlide {
   id: string;
