@@ -10,7 +10,7 @@ import { MediaUploader } from '../ui/MediaUploader';
 
 interface SponsorManagerProps {
   sponsors: Sponsor[];
-  onSave: (sponsors: Sponsor[]) => void;
+  onSave: (sponsors: Sponsor[]) => Promise<void>;
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
 }
 
@@ -35,7 +35,7 @@ export const SponsorManager: React.FC<SponsorManagerProps> = ({
   const handleOpenAdd = () => {
     setEditingId(null);
     setName('');
-    setLogo('');
+    setLogo('/hand_shake.jpeg');
     setWebsite('');
     setOrder(activeSponsors.length + 1);
     setActive(true);
@@ -52,7 +52,7 @@ export const SponsorManager: React.FC<SponsorManagerProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSaveForm = (e: React.FormEvent) => {
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       addToast({ type: 'error', title: 'Name Required', message: 'Please enter a sponsor name.' });
@@ -66,25 +66,26 @@ export const SponsorManager: React.FC<SponsorManagerProps> = ({
             ? { ...s, name: name.trim(), logo, website: website.trim(), order: Number(order), active }
             : s
         );
-        onSave(updated);
+        await onSave(updated);
         addToast({ type: 'success', title: 'Sponsor Updated', message: `${name} has been updated successfully.` });
       } else {
         const newSponsor: Sponsor = {
-          id: `sp-${Date.now()}`,
+          id: crypto.randomUUID(),
           name: name.trim(),
-          logo: logo || 'https://images.unsplash.com/photo-1517649763962-0c623266010b?w=300&auto=format&fit=crop&q=80',
+          logo,
           website: website.trim(),
           order: Number(order),
           active,
         };
-        onSave([...sponsors, newSponsor]);
+        await onSave([...sponsors, newSponsor]);
         addToast({ type: 'success', title: 'Sponsor Created', message: `${name} added to display rotation.` });
       }
 
       setIsModalOpen(false);
     } catch (err) {
-      console.error('Error saving sponsor:', err);
-      addToast({ type: 'error', title: 'Save Exception', message: 'Unable to update sponsor due to storage constraint.' });
+      console.warn('Error saving sponsor:', err);
+      const message = err instanceof Error ? err.message : 'Unable to save sponsor. Restart the development server and try again.';
+      addToast({ type: 'error', title: 'Unable to Save Sponsor', message });
     }
   };
 

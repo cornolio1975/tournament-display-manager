@@ -64,18 +64,35 @@ export async function getSponsors(): Promise<Sponsor[]> {
     console.error('Failed to load sponsors:', error);
     return [];
   }
-  return data || [];
+  return (data ?? []).map(({ is_deleted, ...sponsor }) => ({
+    ...sponsor,
+    isDeleted: is_deleted,
+  }));
 }
 
 export async function saveSponsors(sponsors: Sponsor[]): Promise<void> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error('Supabase is not configured. Restart the development server after updating .env.local.');
+  }
+
+  const now = new Date().toISOString();
   const processed = await Promise.all(
-    sponsors.map(async (s) => ({
-      ...s,
-      logo: await uploadMediaIfDataUrl(s.logo, 'sponsor'),
-    }))
+    sponsors.map(async ({ isDeleted, ...sponsor }) => {
+      const sponsorWithTimestamp = sponsor as typeof sponsor & { created_at?: string };
+      return {
+        ...sponsor,
+        created_at: sponsorWithTimestamp.created_at ?? now,
+        updated_at: now,
+        is_deleted: isDeleted ?? false,
+        logo: await uploadMediaIfDataUrl(sponsor.logo, 'sponsor'),
+      };
+    })
   );
   const { error } = await supabase.from('sponsors').upsert(processed);
-  if (error) console.error('Failed to save sponsors:', error);
+  if (error) {
+    console.warn('Failed to save sponsors:', error.message);
+    throw new Error(error.message || 'Supabase rejected the sponsor save request.');
+  }
 }
 
 // --- DM settings helpers ---
